@@ -1,0 +1,56 @@
+# /etc/systemd/system/ahlan-hermes-bridge.service
+#
+# The ONLY process that talks to Docker. It serves a fixed allow-list of Hermes operations for ONE container
+# on a Unix socket; the API and the worker use that socket instead of Docker.
+[Unit]
+Description=Ahlan Hermes bridge (allow-listed Docker access for the Hermes container)
+After=docker.service
+Requires=docker.service
+
+[Service]
+Type=notify
+NotifyAccess=main
+User=ahlan-bridge
+# Primary group = the group that may open the socket. API/worker units join it via SupplementaryGroups=.
+Group=ahlan-hermes
+# Needed to run `docker exec`. This is the bridge's only privilege; see README "Risiko tersisa".
+SupplementaryGroups=docker
+EnvironmentFile=/etc/ahlan/hermes.env
+ExecStart=/opt/ahlan/bin/hermes-bridge
+Restart=on-failure
+RestartSec=3
+
+# /run/ahlan-hermes/ is created for the service (owner ahlan-bridge, group ahlan-hermes) and removed on stop.
+RuntimeDirectory=ahlan-hermes
+RuntimeDirectoryMode=0750
+StateDirectory=ahlan-bridge
+Environment=HOME=/var/lib/ahlan-bridge
+Environment=DOCKER_CONFIG=/var/lib/ahlan-bridge/.docker
+UMask=0007
+
+# Hardening. The bridge needs no network at all: the Docker socket is a file, reachable inside a private net namespace.
+NoNewPrivileges=yes
+PrivateNetwork=yes
+PrivateTmp=yes
+PrivateDevices=yes
+ProtectSystem=strict
+ProtectHome=yes
+ProtectKernelTunables=yes
+ProtectKernelModules=yes
+ProtectKernelLogs=yes
+ProtectControlGroups=yes
+ProtectClock=yes
+ProtectHostname=yes
+RestrictAddressFamilies=AF_UNIX
+RestrictNamespaces=yes
+RestrictRealtime=yes
+RestrictSUIDSGID=yes
+LockPersonality=yes
+MemoryDenyWriteExecute=yes
+CapabilityBoundingSet=
+AmbientCapabilities=
+SystemCallArchitectures=native
+SystemCallFilter=@system-service
+
+[Install]
+WantedBy=multi-user.target

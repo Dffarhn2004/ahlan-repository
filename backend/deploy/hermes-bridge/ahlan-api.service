@@ -1,0 +1,40 @@
+# /etc/systemd/system/ahlan-api.service      (SYSTEM unit; replaces the user unit of the same name)
+#
+# Same program as before, but started by the system manager so that it can carry the ahlan-hermes group
+# (user units cannot have SupplementaryGroups). It runs as chatbot-pesantren and has NO docker group and NO sudo.
+#
+# EDIT the lines marked "# EDIT" to match the existing user unit:
+#   sudo systemctl --user -M chatbot-pesantren@ cat ahlan-api.service
+[Unit]
+Description=Ahlan API
+After=network-online.target postgresql.service ahlan-hermes-bridge.service
+Wants=network-online.target ahlan-hermes-bridge.service
+
+[Service]
+Type=simple
+User=chatbot-pesantren
+Group=chatbot-pesantren
+# Only this process may open the bridge socket (the login user chatbot-pesantren does NOT get this group).
+SupplementaryGroups=ahlan-hermes
+# EDIT: same as the user unit (its .env is read from here)
+WorkingDirectory=/home/chatbot-pesantren/projects/backend
+# EDIT: same binary path as the user unit
+ExecStart=/home/chatbot-pesantren/projects/backend/bin/api
+EnvironmentFile=/etc/ahlan/hermes.env
+# EDIT: copy any Environment=/EnvironmentFile= lines of the old user unit here (APP_ENV=production, DATABASE_URL, ...).
+Restart=always
+RestartSec=3
+
+# Proof that the application cannot use Docker even if it tried: the sockets do not exist for this process.
+InaccessiblePaths=-/var/run/docker.sock -/run/docker.sock
+NoNewPrivileges=yes
+PrivateTmp=yes
+ProtectSystem=full
+ProtectKernelTunables=yes
+ProtectKernelModules=yes
+ProtectControlGroups=yes
+RestrictSUIDSGID=yes
+LockPersonality=yes
+
+[Install]
+WantedBy=multi-user.target

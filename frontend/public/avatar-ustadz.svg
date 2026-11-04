@@ -1,0 +1,35 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 128 128" role="img" aria-label="Ustadz">
+  <defs>
+    <linearGradient id="bg" x1="0" y1="0" x2="1" y2="1"><stop offset="0" stop-color="#d8efe3"/><stop offset="1" stop-color="#a9d8c0"/></linearGradient>
+    <clipPath id="c"><rect width="128" height="128"/></clipPath>
+  </defs>
+  <g clip-path="url(#c)">
+    <rect width="128" height="128" fill="url(#bg)"/>
+    <!-- baju koko -->
+    <path d="M14 128c2-24 20-36 50-36s48 12 50 36z" fill="#f7f5ee"/>
+    <path d="M64 92v36M58 92l6 10 6-10" stroke="#cfcbbd" stroke-width="2" fill="none"/>
+    <!-- sorban -->
+    <path d="M30 100c10 8 22 12 34 12s24-4 34-12l4 8c-12 10-25 15-38 15S38 118 26 108z" fill="#1f6b4a" opacity=".9"/>
+    <!-- leher -->
+    <rect x="53" y="78" width="22" height="18" rx="8" fill="#d9a77c"/>
+    <!-- telinga -->
+    <ellipse cx="38" cy="58" rx="5" ry="8" fill="#d9a77c"/>
+    <ellipse cx="90" cy="58" rx="5" ry="8" fill="#d9a77c"/>
+    <!-- wajah -->
+    <rect x="39" y="30" width="50" height="56" rx="24" fill="#e5b68c"/>
+    <!-- janggut -->
+    <path d="M39 60c0 6 2 10 4 14 3 8 10 14 21 14s18-6 21-14c2-4 4-8 4-14-4 8-10 10-14 10H53c-4 0-10-2-14-10z" fill="#f1f1ee"/>
+    <path d="M52 68c4 3 20 3 24 0-3 5-8 6-12 6s-9-1-12-6z" fill="#e0dfda"/>
+    <!-- alis & mata -->
+    <path d="M48 51q5-3 10 0M70 51q5-3 10 0" stroke="#d6d6d2" stroke-width="3" stroke-linecap="round" fill="none"/>
+    <circle cx="53" cy="57" r="2.4" fill="#3a2a20"/>
+    <circle cx="75" cy="57" r="2.4" fill="#3a2a20"/>
+    <!-- hidung -->
+    <path d="M64 58v8q-3 2-5 0" stroke="#c28f66" stroke-width="2" stroke-linecap="round" fill="none"/>
+    <!-- senyum -->
+    <path d="M57 73q7 5 14 0" stroke="#8a5a45" stroke-width="2.2" stroke-linecap="round" fill="none"/>
+    <!-- peci -->
+    <path d="M38 38c0-14 11-22 26-22s26 8 26 22c0 2-2 3-4 3H42c-2 0-4-1-4-3z" fill="#1d2a26"/>
+    <rect x="38" y="35" width="52" height="6" rx="3" fill="#2c3d37"/>
+  </g>
+</svg>

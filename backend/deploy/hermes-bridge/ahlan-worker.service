@@ -1,0 +1,34 @@
+# /etc/systemd/system/ahlan-worker.service   (SYSTEM unit; replaces the user unit of the same name)
+# See ahlan-api.service for the reasoning. Read the old unit with:
+#   sudo systemctl --user -M chatbot-pesantren@ cat ahlan-worker.service
+[Unit]
+Description=Ahlan provisioning worker
+After=network-online.target postgresql.service ahlan-hermes-bridge.service
+Wants=network-online.target ahlan-hermes-bridge.service
+
+[Service]
+Type=simple
+User=chatbot-pesantren
+Group=chatbot-pesantren
+SupplementaryGroups=ahlan-hermes
+# EDIT
+WorkingDirectory=/home/chatbot-pesantren/projects/backend
+# EDIT
+ExecStart=/home/chatbot-pesantren/projects/backend/bin/worker
+EnvironmentFile=/etc/ahlan/hermes.env
+# EDIT: copy any Environment=/EnvironmentFile= lines of the old user unit here.
+Restart=always
+RestartSec=3
+
+InaccessiblePaths=-/var/run/docker.sock -/run/docker.sock
+NoNewPrivileges=yes
+PrivateTmp=yes
+ProtectSystem=full
+ProtectKernelTunables=yes
+ProtectKernelModules=yes
+ProtectControlGroups=yes
+RestrictSUIDSGID=yes
+LockPersonality=yes
+
+[Install]
+WantedBy=multi-user.target

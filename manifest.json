@@ -1,0 +1,148 @@
+{
+  "project": "SaaS AI Penerimaan Santri — Go + Hermes + Telegram",
+  "version": "1.0",
+  "created_at": "2026-10-24",
+  "file_count_md": 28,
+  "files": [
+    {
+      "path": "00_Produk/01_visi_kpi.md",
+      "bytes": 2876,
+      "sha256": "1dc7d2627b2b10779aa1af1afe38b862af2ef9055fb5453283cb3a9861c16c73"
+    },
+    {
+      "path": "00_Produk/02_ruang_lingkup_requirements.md",
+      "bytes": 5620,
+      "sha256": "998539070addf766409bb9eb5f5af617bcce82f80cdadbc693c1db70dde8e5bc"
+    },
+    {
+      "path": "00_Produk/03_persona_role_userjourney.md",
+      "bytes": 3489,
+      "sha256": "374bec003f763781a566a7b100eb6f5dba59218865fe87c5b8cbfcf1b3ae7363"
+    },
+    {
+      "path": "00_Produk/04_ux_dashboard.md",
+      "bytes": 4020,
+      "sha256": "9c63193305424f80fe328e3b1b8a79e023c0b3c838ed5efe762f81c181bebbe2"
+    },
+    {
+      "path": "01_Arsitektur/05_arsitektur_sistem.md",
+      "bytes": 4123,
+      "sha256": "7ba15ecedb04114669bf7095892da5d32e14c71c398d908c415296605ee827a0"
+    },
+    {
+      "path": "01_Arsitektur/06_lifecycle_tenant.md",
+      "bytes": 3434,
+      "sha256": "7270e2b372a05f75d635af58a9ede47356e1d50c56ffdfbe68eff20b686a9b83"
+    },
+    {
+      "path": "01_Arsitektur/07_provisioning_hermes.md",
+      "bytes": 5226,
+      "sha256": "1815ca13736ee2ee453800970d96044ca163802d46c0185cb9871f2b7227cb3d"
+    },
+    {
+      "path": "01_Arsitektur/08_telegram.md",
+      "bytes": 3470,
+      "sha256": "ea0cd05eaea99587d1dc0bee83cd92af0e3d9683effa806941c206c544b029aa"
+    },
+    {
+      "path": "01_Arsitektur/09_file_manager.md",
+      "bytes": 3927,
+      "sha256": "59a4ed327437e2da225cff0518b9b7ad1040a616463d981386a8fe2cdf4e5479"
+    },
+    {
+      "path": "01_Arsitektur/10_knowledge_retrieval.md",
+      "bytes": 4093,
+      "sha256": "ea6fce34a03302d045912d46a56d4fa1d70c9b2dfa8407b45dc7206171ff683a"
+    },
+    {
+      "path": "01_Arsitektur/11_admission_workflow.md",
+      "bytes": 2274,
+      "sha256": "cac29e41b4a52dc856d15bdcc9b105f17d741c18c3cb86581f7b272b87b628ea"
+    },
+    {
+      "path": "01_Arsitektur/12_logging_observability.md",
+      "bytes": 3441,
+      "sha256": "ffcc8ef4877f518ec83c8c3d0f2bf698a5f6681a0179252e105608f0be7bbbba"
+    },
+    {
+      "path": "01_Arsitektur/25_crawl_sumber_web.md",
+      "bytes": 12510,
+      "sha256": "e85dfc1fff2d883a31d789c5f7e07311a32b502ca3b8b99215fcb51736bc3b8e"
+    },
+    {
+      "path": "02_Teknis/13_model_database.md",
+      "bytes": 11533,
+      "sha256": "e9aedba2cb92d5cd022f3c1033c95b8410fb2380f3541f18b6477f29340e86c9"
+    },
+    {
+      "path": "02_Teknis/14_api_contract.md",
+      "bytes": 6953,
+      "sha256": "ac7dd75c58a9bc529482154544601ebc734641b09b34561a8c52d903f6052eab"
+    },
+    {
+      "path": "02_Teknis/15_security_privacy.md",
+      "bytes": 6085,
+      "sha256": "170c2d48a7cf6ffa4e7e672ce82fb545201bb20d68f7f673314cb0597f95e9eb"
+    },
+    {
+      "path": "02_Teknis/16_worker_events.md",
+      "bytes": 3547,
+      "sha256": "917c21aec59b33ab0280d7a93f1c6c7849b117d30724aa28d2b7a6bd42b9c18a"
+    },
+    {
+      "path": "02_Teknis/17_go_repository.md",
+      "bytes": 3541,
+      "sha256": "1d1f9c8def8e33635c1db2b52361b71774b7e71945ad9374f831ea1f0d98d985"
+    },
+    {
+      "path": "02_Teknis/18_deployment_ops.md",
+      "bytes": 3899,
+      "sha256": "fb38dc4e7998fdab883d0ddeaac04190a925b719b66c33e7e16d114d945fb021"
+    },
+    {
+      "path": "03_Delivery/19_roadmap_backlog.md",
+      "bytes": 5165,
+      "sha256": "583b9089b36c8920bf7b71d1d1c226f5a249abcbc3cd52a263cd551dfc1ae8e7"
+    },
+    {
+      "path": "03_Delivery/20_acceptance_testing.md",
+      "bytes": 6126,
+      "sha256": "f01f5e4cee496b8e0684e9b1264bed44ba9e15193186475c74103084b9f3fe6f"
+    },
+    {
+      "path": "03_Delivery/21_risks_adr.md",
+      "bytes": 5237,
+      "sha256": "62710ba7a92993a0c68d37b36545ff3104db26f49a531327f15b9dc8dfd02b07"
+    },
+    {
+      "path": "03_Delivery/22_open_questions.md",
+      "bytes": 3876,
+      "sha256": "d20304070172f8fba1ae86c3b010f7b595ab4be6ae0d95ebbf0e923852de0b06"
+    },
+    {
+      "path": "04_Referensi/23_referensi_teknis.md",
+      "bytes": 3591,
+      "sha256": "4cf7f77d3ceb46c0f64da0f0bc6ae5f332dc43edd6ee56adbe82923e4fdd5eaf"
+    },
+    {
+      "path": "04_Referensi/24_glosarium.md",
+      "bytes": 1931,
+      "sha256": "323e84ec0f752884a67a095a054cef5fab2b7163dd105ce548d1a18de0a86433"
+    },
+    {
+      "path": "README.md",
+      "bytes": 5383,
+      "sha256": "7928777f33bd4db8c8f9db3123a247fb44b62912c18a4dbeb37008074510210b"
+    },
+    {
+      "path": "templates/KNOWLEDGE_POLICY.template.md",
+      "bytes": 1343,
+      "sha256": "c19e83b6135470de81b4793f75390efe974b945857a92a24dd1ca457d91d6aac"
+    },
+    {
+      "path": "templates/SOUL.template.md",
+      "bytes": 1653,
+      "sha256": "a02ad7e43715b4067788ef13cbff99855c5ad19d3527e50387fb08a6c00dcc51"
+    }
+  ]
+}

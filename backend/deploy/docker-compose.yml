@@ -1,0 +1,115 @@
+services:
+  postgres:
+    image: postgres:16-alpine
+    environment:
+      POSTGRES_DB: chatbot_pesantren_db
+      POSTGRES_USER: postgres
+      POSTGRES_PASSWORD: postgres-local-only
+    ports:
+      - "5432:5432"
+    volumes:
+      - postgres-data:/var/lib/postgresql/data
+    networks: [app]
+
+  backend-migrate:
+    build:
+      context: ..
+      dockerfile: Dockerfile
+      args:
+        APP: migrate
+    environment:
+      DATABASE_URL: postgres://postgres:postgres-local-only@postgres:5432/chatbot_pesantren_db?sslmode=disable
+      APP_ENV: development
+    depends_on:
+      postgres:
+        condition: service_started
+    networks: [app]
+    restart: "no"
+
+  backend:
+    build:
+      context: ..
+      dockerfile: Dockerfile
+      args:
+        APP: api
+    environment:
+      DATABASE_URL: postgres://postgres:postgres-local-only@postgres:5432/chatbot_pesantren_db?sslmode=disable
+      HTTP_ADDR: :8080
+      DATA_ROOT: /app/data
+      APP_ENV: development
+      HERMES_BASE_URL: ${HERMES_BASE_URL:-http://hermes:8081}
+      HERMES_API_KEY: ${HERMES_API_KEY:-local-hermes-event-key}
+    ports:
+      - "8080:8080"
+    volumes:
+      - ponpes-data:/app/data
+    depends_on:
+      backend-migrate:
+        condition: service_completed_successfully
+    networks: [app]
+
+  worker:
+    build:
+      context: ..
+      dockerfile: Dockerfile
+      args:
+        APP: worker
+    environment:
+      DATABASE_URL: postgres://postgres:postgres-local-only@postgres:5432/chatbot_pesantren_db?sslmode=disable
+      DATA_ROOT: /app/data
+      APP_ENV: development
+      HERMES_BASE_URL: ${HERMES_BASE_URL:-http://hermes:8081}
+      HERMES_API_KEY: ${HERMES_API_KEY:-local-hermes-event-key}
+    volumes:
+      - ponpes-data:/app/data
+    depends_on:
+      backend-migrate:
+        condition: service_completed_successfully
+    networks: [app]
+
+  frontend:
+    build:
+      context: ../../frontend
+      dockerfile: Dockerfile
+      args:
+        NEXT_PUBLIC_API_URL: ${NEXT_PUBLIC_API_URL:-http://localhost:8080}
+    ports:
+      - "3000:3000"
+    depends_on:
+      - backend
+    networks: [app]
+
+  # Official Hermes Agent image. Pin a release digest before production.
+  hermes:
+    image: ${HERMES_IMAGE:-nousresearch/hermes-agent:latest}
+    profiles: [hermes]
+    command: ["gateway", "run"]
+    ports:
+      - "8642:8642"
+      - "9119:9119"
+    expose:
+      - "8642"
+      - "9119"
+    environment:
+      HERMES_DASHBOARD: "1"
+      API_SERVER_HOST: "0.0.0.0"
+      API_SERVER_ENABLED: "true"
+      API_SERVER_KEY: ${HERMES_API_SERVER_KEY:-local-hermes-api-key-change-me}
+      HERMES_DASHBOARD_BASIC_AUTH_USERNAME: ${HERMES_DASHBOARD_USERNAME:-admin}
+      HERMES_DASHBOARD_BASIC_AUTH_PASSWORD: ${HERMES_DASHBOARD_PASSWORD:-admin-local-only}
+      HERMES_DASHBOARD_BASIC_AUTH_SECRET: ${HERMES_DASHBOARD_SECRET:-local-dashboard-secret-change-me}
+    volumes:
+      - hermes-data:/opt/data
+    # Linux needs this for host.docker.internal (Docker Desktop provides it already). See deploy/hermes-bridge/README.md.
+    extra_hosts:
+      - "host.docker.internal:host-gateway"
+    networks: [app]
+
+volumes:
+  postgres-data:
+  ponpes-data:
+  hermes-data:
+
+networks:
+  app:
+    driver: bridge

@@ -1,0 +1,5 @@
+.env
+.env.*
+data
+api-debug.exe
+*.test
