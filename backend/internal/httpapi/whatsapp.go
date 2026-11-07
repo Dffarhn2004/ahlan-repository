@@ -3,6 +3,7 @@ package httpapi
 import (
 	"context"
 	"encoding/base64"
+	"errors"
 	"log/slog"
 	"net/http"
 	"regexp"
@@ -190,6 +191,13 @@ func (s *Server) saveWhatsApp(c *fiber.Ctx) error {
 	if in.AccessMode != "TESTING" && in.AccessMode != "PUBLIC" {
 		return fiber.NewError(http.StatusBadRequest, "INVALID_ACCESS_MODE")
 	}
+	in.ServiceMode = strings.ToUpper(strings.TrimSpace(in.ServiceMode))
+	if in.ServiceMode == "" {
+		in.ServiceMode = "PSB_ONLY"
+	}
+	if in.ServiceMode != "PSB_ONLY" && in.ServiceMode != "GENERAL" {
+		return fiber.NewError(http.StatusBadRequest, "INVALID_SERVICE_MODE")
+	}
 	if in.AccessMode == "PUBLIC" {
 		in.AllowedNumbers = []string{}
 	} else {
@@ -232,6 +240,38 @@ func (s *Server) saveWhatsApp(c *fiber.Ctx) error {
 	s.repo.RecordAudit(c.Context(), id, auditActor(c), "WHATSAPP_CONNECTED", "WHATSAPP_CHANNEL", id.String(), "+"+in.PhoneNumber+" ("+strings.ToLower(in.AccessMode)+")")
 	in.Status = "PENDING"
 	return c.JSON(in)
+}
+
+// setWhatsAppService switches a linked number between a dedicated PSB line and a shared line. The persona is rewritten
+// and a running assistant restarted so the change is live without pairing again.
+func (s *Server) setWhatsAppService(c *fiber.Ctx) error {
+	id, err := tenantIDParam(c)
+	if err != nil {
+		return fiber.NewError(http.StatusBadRequest, "INVALID_TENANT_ID")
+	}
+	var in struct {
+		ServiceMode string `json:"service_mode"`
+	}
+	if err := c.BodyParser(&in); err != nil {
+		return fiber.NewError(http.StatusBadRequest, "INVALID_REQUEST")
+	}
+	mode := strings.ToUpper(strings.TrimSpace(in.ServiceMode))
+	if mode != "PSB_ONLY" && mode != "GENERAL" {
+		return fiber.NewError(http.StatusBadRequest, "INVALID_SERVICE_MODE")
+	}
+	if err := s.repo.SetWhatsAppServiceMode(c.Context(), id, mode); err != nil {
+		if errors.Is(err, repository.ErrNotFound) {
+			return fiber.NewError(http.StatusNotFound, "WHATSAPP_NOT_FOUND")
+		}
+		return err
+	}
+	if profileKey, keyErr := s.repo.HermesProfileKey(c.Context(), id); keyErr == nil {
+		s.refreshPersona(c.Context(), profileKey)
+		admins, _ := s.repo.ListWhatsAppAdmins(c.Context(), id)
+		s.applyHookChange(c.Context(), id, profileKey, mode == "GENERAL" && len(admins) > 0)
+	}
+	s.repo.RecordAudit(c.Context(), id, auditActor(c), "WHATSAPP_SERVICE_MODE", "WHATSAPP_CHANNEL", id.String(), strings.ToLower(mode))
+	return c.JSON(fiber.Map{"service_mode": mode})
 }
 
 func (s *Server) deleteWhatsApp(c *fiber.Ctx) error {

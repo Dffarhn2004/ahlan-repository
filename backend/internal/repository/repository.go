@@ -116,6 +116,8 @@ type WhatsAppChannel struct {
 	// AccessMode is TESTING (only AllowedNumbers may chat) or PUBLIC (anyone may chat).
 	AccessMode     string   `json:"access_mode"`
 	AllowedNumbers []string `json:"allowed_numbers"`
+	// ServiceMode is PSB_ONLY (a dedicated admissions line) or GENERAL (a shared line that asks what the visitor needs).
+	ServiceMode string `json:"service_mode"`
 }
 
 type HermesSettings struct {
@@ -1125,7 +1127,7 @@ GROUP BY t.id, t.name ORDER BY 3 DESC, t.name LIMIT 5`, days)
 
 func (r Repository) GetWhatsAppChannel(ctx context.Context, tenantID uuid.UUID) (WhatsAppChannel, error) {
 	var w WhatsAppChannel
-	err := r.DB.QueryRow(ctx, `SELECT id,tenant_id,phone_number,status,access_mode,allowed_numbers FROM whatsapp_channels WHERE tenant_id=$1`, tenantID).Scan(&w.ID, &w.TenantID, &w.PhoneNumber, &w.Status, &w.AccessMode, &w.AllowedNumbers)
+	err := r.DB.QueryRow(ctx, `SELECT id,tenant_id,phone_number,status,access_mode,allowed_numbers,service_mode FROM whatsapp_channels WHERE tenant_id=$1`, tenantID).Scan(&w.ID, &w.TenantID, &w.PhoneNumber, &w.Status, &w.AccessMode, &w.AllowedNumbers, &w.ServiceMode)
 	if w.AllowedNumbers == nil {
 		w.AllowedNumbers = []string{}
 	}
@@ -1134,7 +1136,16 @@ func (r Repository) GetWhatsAppChannel(ctx context.Context, tenantID uuid.UUID) 
 
 // UpsertWhatsAppChannel saves the linked number and access policy; the channel stays PENDING until the assistant starts.
 func (r Repository) UpsertWhatsAppChannel(ctx context.Context, w WhatsAppChannel) error {
-	_, err := r.DB.Exec(ctx, `INSERT INTO whatsapp_channels(tenant_id,phone_number,status,access_mode,allowed_numbers) VALUES($1,$2,'PENDING',$3,$4) ON CONFLICT (tenant_id) DO UPDATE SET phone_number=EXCLUDED.phone_number,access_mode=EXCLUDED.access_mode,allowed_numbers=EXCLUDED.allowed_numbers,status='PENDING',linked_at=now(),updated_at=now()`, w.TenantID, w.PhoneNumber, w.AccessMode, w.AllowedNumbers)
+	_, err := r.DB.Exec(ctx, `INSERT INTO whatsapp_channels(tenant_id,phone_number,status,access_mode,allowed_numbers,service_mode) VALUES($1,$2,'PENDING',$3,$4,$5) ON CONFLICT (tenant_id) DO UPDATE SET phone_number=EXCLUDED.phone_number,access_mode=EXCLUDED.access_mode,allowed_numbers=EXCLUDED.allowed_numbers,service_mode=EXCLUDED.service_mode,status='PENDING',linked_at=now(),updated_at=now()`, w.TenantID, w.PhoneNumber, w.AccessMode, w.AllowedNumbers, w.ServiceMode)
+	return err
+}
+
+// SetWhatsAppServiceMode changes only the service mode; the link and its status stay as they are.
+func (r Repository) SetWhatsAppServiceMode(ctx context.Context, tenantID uuid.UUID, mode string) error {
+	tag, err := r.DB.Exec(ctx, `UPDATE whatsapp_channels SET service_mode=$2, updated_at=now() WHERE tenant_id=$1`, tenantID, mode)
+	if err == nil && tag.RowsAffected() == 0 {
+		return ErrNotFound
+	}
 	return err
 }
 

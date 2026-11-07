@@ -21,7 +21,19 @@ type knowledgeJobs struct {
 }
 
 func (s *Server) profileSettings(ctx context.Context, profileKey string, settings repository.HermesSettings) hermes.ProfileSettings {
-	return hermes.ProfileSettings{Description: settings.Description, SoulMD: settings.SoulMD, EnabledSkills: settings.EnabledSkills, TenantInfo: s.repo.ProfileInfoByKey(ctx, profileKey)}
+	out := hermes.ProfileSettings{Description: settings.Description, SoulMD: settings.SoulMD, EnabledSkills: settings.EnabledSkills, TenantInfo: s.repo.ProfileInfoByKey(ctx, profileKey)}
+	// A shared WhatsApp line routes non-PSB needs to the tenant's admins.
+	if tenantID, err := s.repo.TenantByHermesProfileKey(ctx, profileKey); err == nil {
+		if channel, err := s.repo.GetWhatsAppChannel(ctx, tenantID); err == nil && channel.ServiceMode == "GENERAL" {
+			if admins, err := s.repo.ListWhatsAppAdmins(ctx, tenantID); err == nil && len(admins) > 0 {
+				out.WhatsAppGeneral = true
+				for _, a := range admins {
+					out.WhatsAppAdmins = append(out.WhatsAppAdmins, hermes.WhatsAppAdmin{Name: a.Name, Phone: a.Phone, NotifyWhen: a.NotifyWhen})
+				}
+			}
+		}
+	}
+	return out
 }
 
 // refreshPersona rewrites an assistant's persona from the global settings and the pesantren profile.

@@ -43,7 +43,9 @@ var kinds = map[string]kindRule{
 // Hosts that need a login or render everything in script, so reading them as text would only yield an empty shell.
 var unlearnable = []string{"forms.gle", "wa.me", "instagram.com", "facebook.com", "fb.com", "fb.me", "tiktok.com", "youtube.com", "youtu.be", "linktr.ee"}
 
-func hostMatches(host, domain string) bool { return host == domain || strings.HasSuffix(host, "."+domain) }
+func hostMatches(host, domain string) bool {
+	return host == domain || strings.HasSuffix(host, "."+domain)
+}
 
 // Label is the Indonesian name of a kind, shown to people and to the assistant.
 func Label(kind string) string { return kinds[kind].label }

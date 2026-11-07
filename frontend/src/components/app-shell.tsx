@@ -3,14 +3,14 @@
 import { useEffect, useRef, useState } from "react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
-import { Bot, Building2, FileText, Globe, LayoutDashboard, LogOut, Menu, MessageCircleQuestion, MessageSquare, PanelLeftClose, PanelLeftOpen, ScrollText, Settings, Sparkles, Users, X } from "lucide-react";
+import { BellRing, Bot, Building2, FileText, Globe, LayoutDashboard, LogOut, Menu, MessageCircleQuestion, MessageSquare, PanelLeftClose, PanelLeftOpen, ScrollText, Settings, Sparkles, Users, X } from "lucide-react";
 import { api, ApiError } from "@/lib/api";
 import { loadAuth, type AuthContext } from "@/lib/auth";
 import { loadBranding } from "@/lib/branding";
 
 type ShellProps = { children: React.ReactNode; mode?: "platform" | "ponpes"; title?: string; active?: string };
 const platform = [{ label: "Overview", href: "/admin/dashboard", icon: LayoutDashboard }, { label: "Pesantren", href: "/admin", icon: Building2 }, { label: "Profil Asisten", href: "/admin/hermes", icon: Bot }, { label: "Audit log", href: "/admin/audit", icon: ScrollText }, { label: "Pengaturan", href: "/settings", icon: Settings }];
-const ponpes = [{ label: "Dashboard", href: "/ponpes/dashboard", icon: LayoutDashboard }, { label: "Asisten AI", href: "/ponpes/profile", icon: Sparkles }, { label: "Dokumen", href: "/ponpes/files", icon: FileText }, { label: "Sumber Web", href: "/ponpes/sources", icon: Globe }, { label: "Percakapan", href: "/ponpes/conversations", icon: MessageSquare }, { label: "Pertanyaan", href: "/ponpes/questions", icon: MessageCircleQuestion }, { label: "Pengguna", href: "/ponpes/users", icon: Users }, { label: "Aktivitas sistem", href: "/audit", icon: ScrollText }];
+const ponpes = [{ label: "Dashboard", href: "/ponpes/dashboard", icon: LayoutDashboard }, { label: "Asisten AI", href: "/ponpes/profile", icon: Sparkles }, { label: "Admin WhatsApp", href: "/ponpes/whatsapp-admin", icon: BellRing }, { label: "Dokumen", href: "/ponpes/files", icon: FileText }, { label: "Sumber Web", href: "/ponpes/sources", icon: Globe }, { label: "Percakapan", href: "/ponpes/conversations", icon: MessageSquare }, { label: "Pertanyaan", href: "/ponpes/questions", icon: MessageCircleQuestion }, { label: "Pengguna", href: "/ponpes/users", icon: Users }, { label: "Aktivitas sistem", href: "/audit", icon: ScrollText }];
 
 export function AppShell({ children, mode = "platform", title, active }: ShellProps) {
   const router = useRouter();
@@ -47,7 +47,7 @@ export function AppShell({ children, mode = "platform", title, active }: ShellPr
   function toggleSidebar() { setSidebarCollapsed(value => { const next = !value; window.localStorage.setItem("sidebar-collapsed", next ? "1" : "0"); return next; }); }
   const platformMode = mode === "platform";
   const items = platformMode ? platform : ponpes;
-  const current = active ?? ({ Overview: "/admin/dashboard", Pesantren: "/admin", "Profil Asisten": "/admin/hermes", Aktivitas: mode === "platform" ? "/admin/audit" : "/audit", "Aktivitas sistem": "/audit", Pengaturan: "/settings", Dashboard: "/ponpes/dashboard", "Asisten AI": "/ponpes/profile", Dokumen: "/ponpes/files", "Sumber Web": "/ponpes/sources", Percakapan: "/ponpes/conversations", Pertanyaan: "/ponpes/questions", Pengguna: "/ponpes/users" }[title ?? ""]);
+  const current = active ?? ({ Overview: "/admin/dashboard", Pesantren: "/admin", "Profil Asisten": "/admin/hermes", Aktivitas: mode === "platform" ? "/admin/audit" : "/audit", "Aktivitas sistem": "/audit", Pengaturan: "/settings", Dashboard: "/ponpes/dashboard", "Asisten AI": "/ponpes/profile", "Admin WhatsApp": "/ponpes/whatsapp-admin", Dokumen: "/ponpes/files", "Sumber Web": "/ponpes/sources", Percakapan: "/ponpes/conversations", Pertanyaan: "/ponpes/questions", Pengguna: "/ponpes/users" }[title ?? ""]);
   const accountName = platformMode ? (auth?.role === "SUPERADMIN" ? "Superadmin" : "Administrator") : (auth?.user.email ?? "Admin Pesantren");
   async function logout() { try { await api("/api/v1/auth/logout", { method: "POST" }); } finally { router.push("/login"); } }
 

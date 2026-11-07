@@ -8,15 +8,15 @@ import (
 
 func TestDiffLines(t *testing.T) {
 	cases := []struct {
-		before, after   string
+		before, after  string
 		added, removed int
 	}{
 		{"", "a\nb", 2, 0},
 		{"a\nb", "", 0, 2},
 		{"a\nb\nc", "a\nb\nc", 0, 0},
 		{"a\nb\nc", "a\nx\nc", 1, 1},
-		{"  a  \n\n\nb", "a\nb", 0, 0},     // whitespace-only differences are not changes
-		{"a\na", "a", 0, 1},                // duplicate lines are counted
+		{"  a  \n\n\nb", "a\nb", 0, 0}, // whitespace-only differences are not changes
+		{"a\na", "a", 0, 1},            // duplicate lines are counted
 		{"biaya 500", "biaya 750\nbaru", 2, 1},
 	}
 	for _, c := range cases {

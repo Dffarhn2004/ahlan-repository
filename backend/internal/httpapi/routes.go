@@ -79,6 +79,9 @@ func (s *Server) tenantRoutes(t fiber.Router) {
 
 	t.Get("/whatsapp", read, s.getWhatsApp)
 	t.Put("/whatsapp", allow("bot:update"), s.saveWhatsApp)
+	t.Put("/whatsapp/service", allow("bot:update"), s.setWhatsAppService)
+	t.Get("/whatsapp/admins", read, s.listWhatsAppAdmins)
+	t.Put("/whatsapp/admins", allow("bot:update"), s.saveWhatsAppAdmins)
 	t.Delete("/whatsapp", allow("bot:update"), s.deleteWhatsApp)
 	t.Post("/whatsapp/pairing", allow("bot:update"), s.startWhatsAppPairing)
 	t.Get("/whatsapp/pairing", allow("bot:update"), s.whatsappPairingStatus)

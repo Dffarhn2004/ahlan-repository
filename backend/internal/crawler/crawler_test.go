@@ -176,7 +176,9 @@ func TestFetcherBlocksRedirectToInternal(t *testing.T) {
 	// A public-looking server that redirects into the internal network. allowInternal lets the test reach the first hop only
 	// through the redirect check, so the second hop is exercised via a Google-origin redirect rule instead.
 	f := NewFetcher(FetcherConfig{allowInternal: true})
-	hop := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) { http.Redirect(w, r, "ftp://example.com/x", http.StatusFound) }))
+	hop := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		http.Redirect(w, r, "ftp://example.com/x", http.StatusFound)
+	}))
 	defer hop.Close()
 	if _, err := f.Get(context.Background(), hop.URL, 1024); !errors.Is(err, ErrForbiddenURL) {
 		t.Errorf("redirect to a non-http scheme must be forbidden, got %v", err)
@@ -302,7 +304,10 @@ func TestGoogleDocuments(t *testing.T) {
 		w.Header().Set("Content-Type", "application/pdf")
 		fmt.Fprint(w, "%PDF-1.4 test")
 	})
-	mux.HandleFunc("/zip", func(w http.ResponseWriter, r *http.Request) { w.Header().Set("Content-Type", "application/zip"); fmt.Fprint(w, "PK") })
+	mux.HandleFunc("/zip", func(w http.ResponseWriter, r *http.Request) {
+		w.Header().Set("Content-Type", "application/zip")
+		fmt.Fprint(w, "PK")
+	})
 	srv := httptest.NewServer(mux)
 	defer srv.Close()
 	start, _ := url.Parse("https://docs.google.com/document/d/1AbCdEfGhIjKlMnOpQrStUvWxYz/edit")

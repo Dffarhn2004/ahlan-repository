@@ -45,6 +45,9 @@ type reqSettings struct {
 	SoulMD        string   `json:"soul_md"`
 	EnabledSkills []string `json:"enabled_skills"`
 	TenantInfo    string   `json:"tenant_info"`
+
+	WhatsAppGeneral bool            `json:"whatsapp_general"`
+	WhatsAppAdmins  []WhatsAppAdmin `json:"whatsapp_admins"`
 }
 
 type reqWelcome struct {

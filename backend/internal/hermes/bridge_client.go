@@ -139,7 +139,7 @@ func (c *BridgeClient) RestartGateway(ctx context.Context) error {
 }
 
 func (c *BridgeClient) ApplyProfileSettings(ctx context.Context, profileKey string, s ProfileSettings) error {
-	return c.call(ctx, bridgeShortTimeout, bridgeProfileSettings, reqSettings{ProfileKey: profileKey, Description: s.Description, SoulMD: s.SoulMD, EnabledSkills: s.EnabledSkills, TenantInfo: s.TenantInfo}, nil)
+	return c.call(ctx, bridgeShortTimeout, bridgeProfileSettings, reqSettings{ProfileKey: profileKey, Description: s.Description, SoulMD: s.SoulMD, EnabledSkills: s.EnabledSkills, TenantInfo: s.TenantInfo, WhatsAppGeneral: s.WhatsAppGeneral, WhatsAppAdmins: s.WhatsAppAdmins}, nil)
 }
 
 func (c *BridgeClient) ApplyClientExperience(ctx context.Context, profileKey string) error {

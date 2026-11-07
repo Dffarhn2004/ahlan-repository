@@ -7,7 +7,7 @@ import { Activity, Bot, CheckCircle2, Clock3, LoaderCircle, MessageCircle, Refre
 import { api } from "@/lib/api";
 import { provisionLabel } from "@/lib/labels";
 import { KnowledgeBanner, useKnowledgeStatus } from "@/components/knowledge-status";
-
+import { ProcessingOverlay } from "@/components/processing-overlay";
 type Tenant = { id: string; provisioning_status: string; slug: string };
 type TelegramBot = { telegram_bot_id: number; username: string; status: string; access_mode?: "TESTING" | "PUBLIC"; allowed_user_ids?: number[] };
 type WhatsAppChannel = { phone_number: string; status: string; access_mode?: "TESTING" | "PUBLIC"; allowed_numbers?: string[] };
@@ -18,25 +18,6 @@ const actionLabels: Record<RunAction, string> = { start: "Aktifkan asisten", res
 const statusClass = (value: string) => { const text = value.toLowerCase(); return text.includes("fail") || text.includes("suspend") || text.includes("error") ? "status status-danger" : text.includes("pending") || text.includes("queue") || text.includes("progress") ? "status status-muted" : "status"; };
 const botStatusLabel = (value: string) => ({ PENDING: "Menunggu", VERIFIED: "Terverifikasi", ACTIVE: "Aktif", SUSPENDED: "Dinonaktifkan", INVALID: "Tidak valid" } as Record<string, string>)[value] ?? value;
 
-/** Blocking popup for slow work, so people understand a long wait is normal and do not close or retry. */
-function ProcessingOverlay({ title, steps }: { title: string; steps: string[] }) {
-  const [index, setIndex] = useState(0);
-  useEffect(() => {
-    const timer = window.setInterval(() => setIndex(current => Math.min(current + 1, steps.length - 1)), 5000);
-    return () => window.clearInterval(timer);
-  }, [steps.length]);
-  return <div className="processing-backdrop" role="alertdialog" aria-modal="true" aria-live="polite" aria-label={title}>
-    <div className="processing-card">
-      <div className="processing-orb" aria-hidden="true"><span className="processing-ring" /><span className="processing-ring processing-ring-2" /><Sparkles size={26} /></div>
-      <h3>{title}</h3>
-      <p className="processing-step" key={index}>{steps[index]}…</p>
-      <div className="processing-bar" aria-hidden="true"><span /></div>
-      <ol className="processing-dots" aria-hidden="true">{steps.map((step, i) => <li key={step} className={i < index ? "done" : i === index ? "current" : ""} />)}</ol>
-      <p className="processing-note">Proses ini membutuhkan waktu sekitar 15–60 detik karena asisten disiapkan khusus untuk pesantren Anda. Mohon jangan menutup atau memuat ulang halaman.</p>
-    </div>
-  </div>;
-}
-
 /** Self-service control for a pesantren's assistant: prepare, connect Telegram, then activate. */
 export function AssistantPanel({ tenantId, canManage, canDelete = false, onChange, showKnowledge = true }: { tenantId: string; canManage: boolean; canDelete?: boolean; onChange?: () => void; showKnowledge?: boolean }) {
   const [tenant, setTenant] = useState<Tenant | null>(null);
@@ -45,6 +26,7 @@ export function AssistantPanel({ tenantId, canManage, canDelete = false, onChang
   const [waModal, setWaModal] = useState(false);
   const [pairing, setPairing] = useState<Pairing>({ status: "none" });
   const [waMode, setWaMode] = useState<"TESTING" | "PUBLIC">("TESTING");
+  const [waService, setWaService] = useState<"PSB_ONLY" | "GENERAL">("PSB_ONLY");
   const [waAllowed, setWaAllowed] = useState("");
   const [waError, setWaError] = useState("");
   const [busyAction, setBusyAction] = useState<string | null>(null);
@@ -197,7 +179,7 @@ export function AssistantPanel({ tenantId, canManage, canDelete = false, onChang
     setWaError("");
     setBusyAction("whatsapp");
     try {
-      await api(`/api/v1/tenants/${tenantId}/whatsapp`, { method: "PUT", body: JSON.stringify({ access_mode: waMode, allowed_numbers: waMode === "TESTING" ? numbers : [] }) });
+      await api(`/api/v1/tenants/${tenantId}/whatsapp`, { method: "PUT", body: JSON.stringify({ access_mode: waMode, allowed_numbers: waMode === "TESTING" ? numbers : [], service_mode: waService }) });
       await api(`/api/v1/tenants/${tenantId}/hermes/action`, { method: "POST", body: JSON.stringify({ action: "start" }) });
       await refreshUntil(true);
       setWaModal(false); setPairing({ status: "none" });
@@ -245,18 +227,26 @@ export function AssistantPanel({ tenantId, canManage, canDelete = false, onChang
       </div>
       <div className="modal-actions"><button className="button" type="button" onClick={() => setModal(false)}>Batal</button><button className="button button-primary" type="submit" disabled={busyAction === "gateway"}>{busyAction === "gateway" ? <LoaderCircle size={15} className="spin" /> : <Bot size={15} />}Simpan &amp; aktifkan</button></div>
     </form></div>}
-    {waModal && <div className="modal-backdrop" role="presentation" onMouseDown={event => { if (event.target === event.currentTarget && !busy) closeWaModal(); }}><form className="modal panel panel-pad" onSubmit={connectWhatsApp}>
+    {waModal && <div className="modal-backdrop" role="presentation" onMouseDown={event => { if (event.target === event.currentTarget && !busy) closeWaModal(); }}><form className="modal panel panel-pad" style={{ width: "min(100%, 880px)", maxHeight: "calc(100vh - 40px)", overflowY: "auto" }} onSubmit={connectWhatsApp}>
       <div className="card-heading"><div><h2 className="section-title">Hubungkan WhatsApp</h2><p className="section-hint">Pindai kode QR dengan WhatsApp di ponsel yang nomornya akan dipakai sebagai nomor asisten. Asisten akan diaktifkan setelah tersimpan.</p></div><button type="button" className="account-action" onClick={closeWaModal}><XCircle size={18} /></button></div>
-      <div style={{ display: "grid", placeItems: "center", gap: 10, padding: "6px 0 14px" }}>
+      <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(280px, 1fr))", gap: 28, alignItems: "start" }}>
+      <div style={{ display: "grid", placeItems: "center", alignContent: "start", gap: 10, padding: "6px 0 14px" }}>
         <div style={{ width: 232, height: 232, display: "grid", placeItems: "center", background: "#fff", borderRadius: 12, border: "1px solid var(--border, #e5e7eb)", overflow: "hidden" }}>
           {pairing.status === "qr" && pairing.qr ? <img src={pairing.qr} alt="Kode QR WhatsApp" width={216} height={216} /> : pairing.status === "connected" ? <div style={{ display: "grid", placeItems: "center", gap: 6, color: "#15803d" }}><CheckCircle2 size={44} /><strong>Terhubung</strong><span style={{ fontSize: 13 }}>+{pairing.phone_number}</span></div> : pairing.status === "error" ? <div style={{ display: "grid", placeItems: "center", gap: 8, padding: 12, textAlign: "center" }}><XCircle size={32} /><span style={{ fontSize: 13 }}>{pairing.error === "expired" ? "Kode QR kedaluwarsa." : "Kode QR gagal dibuat."}</span><button className="button" type="button" onClick={() => void startPairing()}><RefreshCw size={14} />Buat ulang</button></div> : <div style={{ display: "grid", placeItems: "center", gap: 8 }}><LoaderCircle size={26} className="spin" /><span style={{ fontSize: 13 }}>Menyiapkan kode QR…</span></div>}
         </div>
         {pairing.status === "qr" && <span className="field-help" style={{ textAlign: "center" }}>Buka WhatsApp → Pengaturan → Perangkat tertaut → Tautkan perangkat, lalu pindai kode ini.</span>}
       </div>
+      <div style={{ display: "grid", gap: 18 }}>
+      <div><span className="field-label">Nomor ini dipakai untuk apa?</span>
+        <div className="access-toggle" role="radiogroup" aria-label="Layanan nomor WhatsApp"><button type="button" role="radio" aria-checked={waService === "PSB_ONLY"} className={waService === "PSB_ONLY" ? "active" : ""} onClick={() => setWaService("PSB_ONLY")}><strong>Khusus PSB</strong><span>Asisten langsung menjawab</span></button><button type="button" role="radio" aria-checked={waService === "GENERAL"} className={waService === "GENERAL" ? "active" : ""} onClick={() => setWaService("GENERAL")}><strong>Umum</strong><span>Tanya keperluan dulu</span></button></div>
+        <span className="field-help" style={{ display: "block", marginTop: 6 }}>{waService === "GENERAL" ? "Asisten menanyakan keperluan pengunjung. PSB dijawab asisten, keperluan lain diteruskan ke admin. Daftar admin diisi di menu Admin WhatsApp setelah WhatsApp terhubung." : "Cocok untuk nomor khusus admin PSB."}</span>
+      </div>
       <div><span className="field-label">Siapa yang boleh memakai asisten?</span>
         <div className="access-toggle" role="radiogroup" aria-label="Mode akses WhatsApp"><button type="button" role="radio" aria-checked={waMode === "TESTING"} className={waMode === "TESTING" ? "active" : ""} onClick={() => setWaMode("TESTING")}><strong>Uji coba</strong><span>Hanya nomor tertentu</span></button><button type="button" role="radio" aria-checked={waMode === "PUBLIC"} className={waMode === "PUBLIC" ? "active" : ""} onClick={() => setWaMode("PUBLIC")}><strong>Publik</strong><span>Semua orang</span></button></div>
         {waMode === "TESTING" ? <label className="access-detail"><span className="field-label">Nomor WhatsApp penguji</span><input className="input" required inputMode="tel" value={waAllowed} onChange={event => setWaAllowed(event.target.value)} placeholder="6281234567890, 6285987654321" /><span className="field-help">Pisahkan dengan koma untuk lebih dari satu orang. Hanya nomor ini yang dapat mengobrol dengan asisten. Gunakan kode negara (62) atau awali dengan 0.</span></label> : <p className="access-warning" role="note">Mode publik: siapa pun yang mengirim pesan ke nomor ini akan dilayani asisten. Gunakan setelah pengujian selesai.</p>}
         {waError && <div className="error" role="alert" style={{ marginTop: 10 }}>{waError}</div>}
+      </div>
+      </div>
       </div>
       <div className="modal-actions"><button className="button" type="button" onClick={closeWaModal}>Batal</button><button className="button button-primary" type="submit" disabled={busyAction === "whatsapp" || pairing.status !== "connected"}>{busyAction === "whatsapp" ? <LoaderCircle size={15} className="spin" /> : <MessageCircle size={15} />}Simpan &amp; aktifkan</button></div>
     </form></div>}
