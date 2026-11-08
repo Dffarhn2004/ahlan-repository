@@ -10,13 +10,13 @@ import (
 )
 
 // The listener exposed to the Hermes container must serve the event callback and nothing else.
-func TestEventsAppExposesOnlyTheEventRoute(t *testing.T) {
+func TestEventsAppExposesOnlyTheHermesCallbacks(t *testing.T) {
 	app := NewServer(config.Config{HermesAPIKey: "k-for-test-123"}, repository.Repository{}, storage.New(t.TempDir())).EventsApp()
 	routes := 0
 	for _, route := range app.GetRoutes(true) {
 		if route.Path != "/" || route.Method != "HEAD" {
 			routes++
-			if route.Path != "/api/v1/internal/hermes/events" {
+			if route.Path != "/api/v1/internal/hermes/events" && route.Path != "/api/v1/internal/hermes/handoff" {
 				t.Errorf("unexpected route on the events listener: %s %s", route.Method, route.Path)
 			}
 		}
@@ -30,9 +30,11 @@ func TestEventsAppExposesOnlyTheEventRoute(t *testing.T) {
 			t.Errorf("%s should not be served on the events listener, got %d", path, resp.StatusCode)
 		}
 	}
-	// Without the shared key the callback is refused.
-	resp, err := app.Test(httptest.NewRequest("POST", "/api/v1/internal/hermes/events", nil))
-	if err != nil || resp.StatusCode == 200 {
-		t.Fatalf("callback without key must be refused, got %v %v", resp, err)
+	// Without the shared key every callback is refused.
+	for _, path := range []string{"/api/v1/internal/hermes/events", "/api/v1/internal/hermes/handoff"} {
+		resp, err := app.Test(httptest.NewRequest("POST", path, nil))
+		if err != nil || resp.StatusCode != 401 {
+			t.Fatalf("%s without key must be refused with 401, got %v %v", path, resp, err)
+		}
 	}
 }

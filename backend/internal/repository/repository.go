@@ -374,6 +374,16 @@ func (r Repository) UpsertConversation(ctx context.Context, tenantID uuid.UUID, 
 	return item, err
 }
 
+// FindConversation returns an existing conversation without creating one (ErrNotFound when there is none).
+func (r Repository) FindConversation(ctx context.Context, tenantID uuid.UUID, channel string, chatID int64) (Conversation, error) {
+	var item Conversation
+	err := r.DB.QueryRow(ctx, `SELECT id,tenant_id,telegram_chat_id,telegram_user_id,coalesce(username,''),status,started_at,last_message_at FROM telegram_conversations WHERE tenant_id=$1 AND channel=$2 AND telegram_chat_id=$3`, tenantID, channel, chatID).Scan(&item.ID, &item.TenantID, &item.TelegramChatID, &item.TelegramUserID, &item.Username, &item.Status, &item.StartedAt, &item.LastMessageAt)
+	if errors.Is(err, pgx.ErrNoRows) {
+		return item, ErrNotFound
+	}
+	return item, err
+}
+
 func (r Repository) AddTelegramMessage(ctx context.Context, conversationID uuid.UUID, senderType, text string, telegramMessageID *int64) (TelegramMessage, error) {
 	var item TelegramMessage
 	err := r.DB.QueryRow(ctx, `INSERT INTO telegram_messages(conversation_id,sender_type,message_text,telegram_message_id) VALUES($1,$2,$3,$4) RETURNING id,conversation_id,sender_type,message_text,telegram_message_id,created_at`, conversationID, senderType, text, telegramMessageID).Scan(&item.ID, &item.ConversationID, &item.SenderType, &item.MessageText, &item.TelegramMessageID, &item.CreatedAt)

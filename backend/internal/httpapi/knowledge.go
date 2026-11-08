@@ -27,6 +27,7 @@ func (s *Server) profileSettings(ctx context.Context, profileKey string, setting
 		if channel, err := s.repo.GetWhatsAppChannel(ctx, tenantID); err == nil && channel.ServiceMode == "GENERAL" {
 			if admins, err := s.repo.ListWhatsAppAdmins(ctx, tenantID); err == nil && len(admins) > 0 {
 				out.WhatsAppGeneral = true
+				out.HandoffURL, out.HandoffKey = s.handoffURL(), s.cfg.HermesAPIKey
 				for _, a := range admins {
 					out.WhatsAppAdmins = append(out.WhatsAppAdmins, hermes.WhatsAppAdmin{Name: a.Name, Phone: a.Phone, NotifyWhen: a.NotifyWhen})
 				}

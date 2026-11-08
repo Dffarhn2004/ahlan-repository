@@ -77,6 +77,10 @@ type ProfileSettings struct {
 	// PSB itself and routes other needs to WhatsAppAdmins (who are notified on WhatsApp).
 	WhatsAppGeneral bool
 	WhatsAppAdmins  []WhatsAppAdmin
+	// HandoffURL and HandoffKey let the notify hook and the handoff plugin inside the container tell the API that a
+	// visitor was passed to an admin and ask whether a conversation is still handed off.
+	HandoffURL string
+	HandoffKey string
 }
 
 // WhatsAppAdmin is a person the assistant routes a visitor to and who gets a WhatsApp notification. Phone is +<digits>.
@@ -820,7 +824,10 @@ func (c DockerClient) ApplyProfileSettings(ctx context.Context, profileKey strin
 	}
 	// Best effort: a failed cleanup must not fail a settings update.
 	_ = c.PurgeAttachments(ctx, profileKey)
-	return c.syncNotifyHook(ctx, profileKey, settings.WhatsAppAdmins, routing)
+	if err := c.syncNotifyHook(ctx, profileKey, settings, routing); err != nil {
+		return err
+	}
+	return c.syncHandoffPlugin(ctx, profileKey, settings, routing)
 }
 
 // logHookHandler is the Python source of the conversation-log hook for one profile.

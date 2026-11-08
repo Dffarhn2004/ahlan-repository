@@ -31,3 +31,17 @@ func TestNotifyHookHandlerIsValidPython(t *testing.T) {
 		t.Fatalf("handler does not compile: %v: %s", err, output)
 	}
 }
+
+func TestHandoffPluginIsValidPython(t *testing.T) {
+	python, err := exec.LookPath("python")
+	if err != nil {
+		t.Skip("python not installed")
+	}
+	file := filepath.Join(t.TempDir(), "__init__.py")
+	if err := os.WriteFile(file, []byte(handoffPluginSource), 0o600); err != nil {
+		t.Fatal(err)
+	}
+	if output, err := exec.Command(python, "-I", "-m", "py_compile", file).CombinedOutput(); err != nil {
+		t.Fatalf("plugin does not compile: %v: %s", err, output)
+	}
+}

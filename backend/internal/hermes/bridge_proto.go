@@ -48,6 +48,8 @@ type reqSettings struct {
 
 	WhatsAppGeneral bool            `json:"whatsapp_general"`
 	WhatsAppAdmins  []WhatsAppAdmin `json:"whatsapp_admins"`
+	HandoffURL      string          `json:"handoff_url"`
+	HandoffKey      string          `json:"handoff_key"`
 }
 
 type reqWelcome struct {

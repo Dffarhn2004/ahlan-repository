@@ -42,18 +42,24 @@ export function WhatsAppRouting({ tenantId, canEdit }: { tenantId: string; canEd
   useEffect(() => {
     let cancelled = false;
     void (async () => {
+      // The admin list lives apart from the WhatsApp link, so it loads (and stays editable) even when no number is linked.
+      let nextMode: Mode = "PSB_ONLY";
+      let isLinked = true;
+      let failed = false;
       try {
         const channel = await api<{ service_mode?: Mode }>(base);
-        const list = await api<{ data: Admin[] }>(`${base}/admins`);
-        if (cancelled) return;
-        setMode(channel?.service_mode === "GENERAL" ? "GENERAL" : "PSB_ONLY");
-        setAdmins(list?.data ?? []);
+        nextMode = channel?.service_mode === "GENERAL" ? "GENERAL" : "PSB_ONLY";
       } catch (error) {
-        if (cancelled) return;
-        if (error instanceof ApiError && error.status === 404) setLinked(false);
-        else setNotice("Pengaturan WhatsApp belum dapat dimuat.");
-        setMode("PSB_ONLY");
+        if (error instanceof ApiError && error.status === 404) isLinked = false;
+        else failed = true;
       }
+      let list: Admin[] = [];
+      try { list = (await api<{ data: Admin[] }>(`${base}/admins`))?.data ?? []; } catch { failed = true; }
+      if (cancelled) return;
+      setLinked(isLinked);
+      setMode(nextMode);
+      setAdmins(list);
+      if (failed) setNotice("Pengaturan WhatsApp belum dapat dimuat.");
     })();
     return () => { cancelled = true; };
   }, [base]);
@@ -61,7 +67,7 @@ export function WhatsAppRouting({ tenantId, canEdit }: { tenantId: string; canEd
   const failure = (error: unknown, fallback: string) => error instanceof ApiError ? (errorText[error.message] ?? fallback) : fallback;
 
   async function changeMode(next: Mode) {
-    if (!canEdit || busy || next === mode) return;
+    if (!canEdit || busy || !linked || next === mode) return;
     setBusy(true); setWorking("mode"); setNotice("");
     try {
       await api(`${base}/service`, { method: "PUT", body: JSON.stringify({ service_mode: next }) });
@@ -103,21 +109,26 @@ export function WhatsAppRouting({ tenantId, canEdit }: { tenantId: string; canEd
   }
 
   if (mode === null) return <p className="empty"><LoaderCircle size={14} className="spin" /> Memuat…</p>;
-  if (!linked) return <section className="panel panel-pad"><p className="empty">WhatsApp belum terhubung. Hubungkan nomor WhatsApp di menu Asisten AI terlebih dahulu.</p></section>;
-
   return <section className="panel panel-pad" style={{ display: "grid", gap: 20 }}>
     <div>
-      <h2 className="section-title">Layanan nomor WhatsApp</h2>
-      <div className="access-toggle" role="radiogroup" aria-label="Layanan nomor WhatsApp" style={{ marginTop: 10 }}>
-        <button type="button" role="radio" aria-checked={mode === "PSB_ONLY"} className={mode === "PSB_ONLY" ? "active" : ""} disabled={!canEdit || busy} onClick={() => void changeMode("PSB_ONLY")}><strong>Khusus PSB</strong><span>Asisten langsung menjawab</span></button>
-        <button type="button" role="radio" aria-checked={mode === "GENERAL"} className={mode === "GENERAL" ? "active" : ""} disabled={!canEdit || busy} onClick={() => void changeMode("GENERAL")}><strong>Umum</strong><span>Tanya keperluan dulu</span></button>
+      <div style={{ display: "flex", gap: 12, justifyContent: "space-between", alignItems: "center", flexWrap: "wrap" }}>
+        <h2 className="section-title">Layanan nomor WhatsApp</h2>
+        <span className={linked ? "status" : "error"} role="status" style={{ display: "inline-flex", alignItems: "center", gap: 6 }}>
+          <span aria-hidden style={{ width: 8, height: 8, borderRadius: "50%", background: linked ? "var(--success, #16a34a)" : "var(--danger, #dc2626)" }} />
+          {linked ? "WhatsApp terhubung" : "WhatsApp tidak aktif"}
+        </span>
+      </div>
+      {!linked && <p className="field-help" style={{ marginTop: 6 }}>Belum ada nomor WhatsApp yang terhubung. Daftar admin tetap tersimpan dan bisa diubah; pilihan layanan aktif setelah nomor dihubungkan kembali di menu Asisten AI.</p>}
+      <div className="access-toggle" role="radiogroup" aria-label="Layanan nomor WhatsApp" style={{ marginTop: 10, opacity: linked ? 1 : 0.6 }}>
+        <button type="button" role="radio" aria-checked={mode === "PSB_ONLY"} className={mode === "PSB_ONLY" ? "active" : ""} disabled={!canEdit || busy || !linked} onClick={() => void changeMode("PSB_ONLY")}><strong>Khusus PSB</strong><span>Asisten langsung menjawab</span></button>
+        <button type="button" role="radio" aria-checked={mode === "GENERAL"} className={mode === "GENERAL" ? "active" : ""} disabled={!canEdit || busy || !linked} onClick={() => void changeMode("GENERAL")}><strong>Umum</strong><span>Tanya keperluan dulu</span></button>
       </div>
       <span className="field-help" style={{ display: "block", marginTop: 8 }}>
-        {mode === "GENERAL" ? "Asisten menanyakan keperluan pengunjung. PSB dijawab asisten; keperluan lain diteruskan ke admin di bawah, yang diberi tahu lewat WhatsApp. Tanpa admin, mode ini berjalan seperti Khusus PSB." : "Cocok untuk nomor khusus admin PSB: asisten langsung menjawab pertanyaan pengunjung."}
+        {mode === "GENERAL" ?"Asisten menanyakan keperluan pengunjung. PSB dijawab asisten; keperluan lain diteruskan ke admin di bawah, yang diberi tahu lewat WhatsApp. Tanpa admin, mode ini berjalan seperti Khusus PSB." : "Cocok untuk nomor khusus admin PSB: asisten langsung menjawab pertanyaan pengunjung."}
       </span>
     </div>
 
-    {mode === "GENERAL" && <div>
+    {(mode === "GENERAL" || !linked) && <div>
       <div className="card-heading"><div><h2 className="section-title">Admin penerima notifikasi</h2><p className="section-hint">Saat pengunjung punya keperluan selain PSB, asisten memilih admin yang cocok lalu Hermes mengirim WhatsApp ke admin itu berisi nomor pengunjung dan keperluannya. Nomor admin tidak ditampilkan ke pengunjung.</p></div>
         {canEdit && <button className="button" type="button" disabled={busy || admins.length >= MAX_ADMINS} onClick={() => open(-1)}><Plus size={14} />Tambah admin</button>}</div>
       {admins.length === 0 && <p className="empty">Belum ada admin. Tanpa admin, asisten tidak meneruskan keperluan selain PSB.</p>}

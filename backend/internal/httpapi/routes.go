@@ -8,6 +8,7 @@ import "github.com/gofiber/fiber/v2"
 func (s *Server) EventsApp() *fiber.App {
 	app := newFiber()
 	app.Post("/api/v1/internal/hermes/events", s.hermesEvent)
+	app.Post("/api/v1/internal/hermes/handoff", s.hermesHandoff)
 	return app
 }
 
@@ -24,6 +25,7 @@ func (s *Server) App() *fiber.App {
 	app.Get("/api/v1/public/p/:slug/links/:kind", s.getPublicFolderLinks)
 	app.Get("/api/v1/public/p", s.listPublicLinks)
 	app.Post("/api/v1/internal/hermes/events", s.hermesEvent) // authenticated by X-Hermes-Event-Key, not a session
+	app.Post("/api/v1/internal/hermes/handoff", s.hermesHandoff)
 
 	api := app.Group("/api/v1")
 	api.Use(s.authenticate)

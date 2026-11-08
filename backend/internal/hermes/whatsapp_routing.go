@@ -34,7 +34,7 @@ func oneLine(value string) string {
 }
 
 // syncNotifyHook installs (routing) or removes the hook that WhatsApps an admin when the assistant names them.
-func (c DockerClient) syncNotifyHook(ctx context.Context, profileKey string, admins []WhatsAppAdmin, routing bool) error {
+func (c DockerClient) syncNotifyHook(ctx context.Context, profileKey string, settings ProfileSettings, routing bool) error {
 	dir := "/opt/data/profiles/" + profileKey + "/hooks/ponpes-notify"
 	if !routing {
 		if output, err := exec.CommandContext(ctx, "docker", "exec", c.Container, "rm", "-rf", dir).CombinedOutput(); err != nil {
@@ -44,7 +44,8 @@ func (c DockerClient) syncNotifyHook(ctx context.Context, profileKey string, adm
 	}
 	files := map[string]string{
 		dir + "/HOOK.yaml":   "name: ponpes-notify\ndescription: Tell an admin on WhatsApp when a visitor is routed to them\nevents:\n  - agent:start\n  - agent:end\n",
-		dir + "/admins.json": string(mustJSON(admins)),
+		dir + "/admins.json": string(mustJSON(settings.WhatsAppAdmins)),
+		dir + "/api.json":    handoffAPIConfig(settings),
 		dir + "/profile.txt": profileKey,
 		dir + "/handler.py":  notifyHookHandler,
 	}
@@ -65,6 +66,7 @@ import re
 import subprocess
 import sys
 import time
+import urllib.request
 from datetime import datetime, timedelta, timezone
 from pathlib import Path
 
@@ -102,6 +104,18 @@ def _phone(raw):
         except Exception:
             continue
     return ""
+
+
+def _start_handoff(chat_id, user_id):
+    # Tell the API this visitor now talks to an admin, so the assistant stays quiet until the admin marks it done.
+    try:
+        config = json.loads((_DIR / "api.json").read_text(encoding="utf-8"))
+        body = json.dumps({"profile_key": _PROFILE, "action": "start", "chat_id": str(chat_id or ""), "user_id": str(user_id or "")}).encode("utf-8")
+        request = urllib.request.Request(config["url"], data=body, headers={"Content-Type": "application/json", "X-Hermes-Event-Key": config["key"]})
+        urllib.request.urlopen(request, timeout=5).read()
+        _log("handoff started for %s" % chat_id)
+    except Exception as error:
+        _log("handoff start failed: %s" % error)
 
 
 def _wib():
@@ -165,6 +179,8 @@ def handle(event_type, context):
             target = "whatsapp:%s@s.whatsapp.net" % _digits(admin["phone"])
             result = subprocess.run(["hermes", "-p", _PROFILE, "send", "--to", target, "--quiet", text], capture_output=True, text=True, timeout=60)
             _log("send exit=%s stdout=%r stderr=%r" % (result.returncode, result.stdout.strip(), result.stderr.strip()))
+            if result.returncode == 0:
+                _start_handoff(context.get("chat_id"), context.get("user_id"))
     except Exception as error:
         _log("error: %s" % error)
 `

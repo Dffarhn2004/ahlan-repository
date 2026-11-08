@@ -192,10 +192,10 @@ func (s *BridgeServer) routes() {
 		if err := ValidateProfileKey(in.ProfileKey); err != nil {
 			return "", err
 		}
-		if len(in.SoulMD) > MaxSoulBytes || len(in.Description) > MaxDescriptionBytes || len(in.TenantInfo) > MaxSoulBytes || len(in.EnabledSkills) > 200 || len(in.WhatsAppAdmins) > 20 {
+		if len(in.SoulMD) > MaxSoulBytes || len(in.Description) > MaxDescriptionBytes || len(in.TenantInfo) > MaxSoulBytes || len(in.EnabledSkills) > 200 || len(in.WhatsAppAdmins) > 20 || len(in.HandoffURL) > 512 || len(in.HandoffKey) > 512 {
 			return in.ProfileKey, fmt.Errorf("%w: profile settings too large", ErrInvalidInput)
 		}
-		settings := ProfileSettings{Description: in.Description, SoulMD: in.SoulMD, EnabledSkills: in.EnabledSkills, TenantInfo: in.TenantInfo, WhatsAppGeneral: in.WhatsAppGeneral, WhatsAppAdmins: in.WhatsAppAdmins}
+		settings := ProfileSettings{Description: in.Description, SoulMD: in.SoulMD, EnabledSkills: in.EnabledSkills, TenantInfo: in.TenantInfo, WhatsAppGeneral: in.WhatsAppGeneral, WhatsAppAdmins: in.WhatsAppAdmins, HandoffURL: in.HandoffURL, HandoffKey: in.HandoffKey}
 		return in.ProfileKey, finish(w, s.exec.ApplyProfileSettings(r.Context(), in.ProfileKey, settings))
 	})
 	s.route(http.MethodPost, bridgeClientExperience, func(w http.ResponseWriter, r *http.Request) (string, error) {
