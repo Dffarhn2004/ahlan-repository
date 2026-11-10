@@ -7,6 +7,7 @@ import (
 	"log/slog"
 	"net/http"
 	"strings"
+	"time"
 
 	"github.com/gofiber/fiber/v2"
 	"ponpes-saas/internal/repository"
@@ -24,6 +25,9 @@ type handoffRequest struct {
 	UserID     string `json:"user_id"`
 	Text       string `json:"text"`
 }
+
+// handoffIdleLimit is how long a hand-off stays in force without any visitor message.
+const handoffIdleLimit = 12 * time.Hour
 
 // hermesHandoff is called by the notify hook and the handoff plugin inside the Hermes container. It is
 // authenticated like hermesEvent, with the X-Hermes-Event-Key secret.
@@ -58,6 +62,21 @@ func (s *Server) hermesHandoff(c *fiber.Ctx) error {
 			return err
 		}
 		return c.JSON(fiber.Map{"handoff": true})
+	case "end":
+		// The visitor started a new conversation (/new): release the hand-off so the assistant answers again.
+		conversation, err := s.repo.FindConversation(c.Context(), tenantID, "WHATSAPP", chatID)
+		if err != nil {
+			if errors.Is(err, repository.ErrNotFound) {
+				return c.JSON(fiber.Map{"handoff": false})
+			}
+			return err
+		}
+		if conversation.Status == "HANDOFF" {
+			if _, err := s.repo.SetConversationStatus(c.Context(), conversation.ID, "ACTIVE"); err != nil {
+				return err
+			}
+		}
+		return c.JSON(fiber.Map{"handoff": false})
 	case "check":
 		conversation, err := s.repo.FindConversation(c.Context(), tenantID, "WHATSAPP", chatID)
 		if err != nil {
@@ -69,7 +88,18 @@ func (s *Server) hermesHandoff(c *fiber.Ctx) error {
 		if conversation.Status != "HANDOFF" {
 			return c.JSON(fiber.Map{"handoff": false})
 		}
-		if text := strings.TrimSpace(in.Text); text != "" {
+		// A forgotten hand-off must not silence the assistant forever: after handoffIdleLimit without a visitor
+			// message the conversation goes back to ACTIVE and the assistant answers again.
+			if time.Since(conversation.LastMessageAt) > handoffIdleLimit {
+				if _, err := s.repo.SetConversationStatus(c.Context(), conversation.ID, "ACTIVE"); err != nil {
+					return err
+				}
+				return c.JSON(fiber.Map{"handoff": false})
+			}
+			if err := s.repo.TouchConversation(c.Context(), conversation.ID); err != nil {
+				slog.Warn("could not refresh a hand-off", "tenant_id", tenantID, "error", err)
+			}
+			if text := strings.TrimSpace(in.Text); text != "" {
 			if _, err := s.repo.AddTelegramMessage(c.Context(), conversation.ID, "USER", text, nil); err != nil {
 				slog.Warn("could not log a handed-off message", "tenant_id", tenantID, "error", err)
 			}

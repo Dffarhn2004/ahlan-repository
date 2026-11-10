@@ -85,6 +85,17 @@ def _is_handed_off(chat_id, user_id, text):
         return bool(json.loads(response.read().decode("utf-8")).get("handoff"))
 
 
+def _end_handoff(chat_id, user_id):
+    try:
+        config = json.loads((_DIR / "api.json").read_text(encoding="utf-8"))
+        body = json.dumps({"profile_key": _PROFILE, "action": "end", "chat_id": chat_id, "user_id": user_id}).encode("utf-8")
+        request = urllib.request.Request(config["url"], data=body, headers={"Content-Type": "application/json", "X-Hermes-Event-Key": config["key"]})
+        urllib.request.urlopen(request, timeout=2).read()
+        _log("handoff released for %s" % chat_id)
+    except Exception as error:
+        _log("handoff release failed: %s" % error)
+
+
 def _send_notice(chat_id):
     try:
         subprocess.run(["hermes", "-p", _PROFILE, "send", "--to", "whatsapp:" + chat_id, "--quiet", _NOTICE], capture_output=True, text=True, timeout=60)
@@ -100,9 +111,15 @@ def _on_pre_gateway_dispatch(event=None, **kwargs):
             return None
         chat_id = str(getattr(source, "chat_id", "") or "")
         text = str(getattr(event, "text", "") or "")
-        if not chat_id or text.startswith("/"):
+        if not chat_id:
             return None
         user_id = str(getattr(source, "user_id", "") or "")
+        if text.startswith("/"):
+            # /new starts a fresh conversation, so it also releases a hand-off; other commands pass untouched.
+            if text.strip().lower().split()[0] in ("/new", "/reset"):
+                _noticed.discard(chat_id)
+                _end_handoff(chat_id, user_id)
+            return None
         if not _is_handed_off(chat_id, user_id, text[:2000]):
             _noticed.discard(chat_id)
             return None

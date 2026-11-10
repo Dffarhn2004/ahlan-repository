@@ -2,6 +2,7 @@ package httpapi
 
 import (
 	"net/http"
+	"path/filepath"
 	"strings"
 
 	"github.com/gofiber/fiber/v2"
@@ -85,6 +86,54 @@ func (s *Server) downloadFile(c *fiber.Ctx) error {
 	return c.SendFile(path)
 }
 
+// replaceFile swaps the content of an existing document (the "update" button). The record keeps its folder; the
+// filename is kept too unless the new file has another extension, because the assistant reads a document by its
+// extension. The document returns to PENDING_SYNC so the next sync re-reads it.
+func (s *Server) replaceFile(c *fiber.Ctx) error {
+	id, fileID, err := tenantAndFile(c)
+	if err != nil {
+		return err
+	}
+	item, err := s.repo.FindFile(c.Context(), id, fileID)
+	if err != nil {
+		return fiber.NewError(http.StatusNotFound, "FILE_NOT_FOUND")
+	}
+	header, err := c.FormFile("file")
+	if err != nil || header.Size > maxUploadBytes {
+		return fiber.NewError(http.StatusBadRequest, "INVALID_FILE")
+	}
+	src, err := header.Open()
+	if err != nil {
+		return fiber.NewError(http.StatusBadRequest, "FILE_READ_FAILED")
+	}
+	defer src.Close()
+	key, size, sum, err := s.store.Put(id.String(), header.Filename, src, maxUploadBytes)
+	if err != nil {
+		return fiber.NewError(http.StatusBadRequest, "INVALID_FILE")
+	}
+	if err := s.repo.ReplaceFileContent(c.Context(), id, fileID, key, header.Header.Get("Content-Type"), size, sum); err != nil {
+		_ = s.store.Delete(id.String(), key)
+		return err
+	}
+	filename := item.Filename
+	if !strings.EqualFold(filepath.Ext(header.Filename), filepath.Ext(item.Filename)) {
+		filename = header.Filename
+		if err := s.repo.RenameFile(c.Context(), id, fileID, filename); err != nil {
+			return err
+		}
+	}
+	if key != item.StorageKey {
+		_ = s.store.Delete(id.String(), item.StorageKey)
+	}
+	s.knowledge.dirty.Store(id, true)
+	s.repo.RecordAudit(c.Context(), id, auditActor(c), "FILE_REPLACED", "FILE", fileID.String(), filename)
+	updated, err := s.repo.FindFile(c.Context(), id, fileID)
+	if err != nil {
+		return fiber.NewError(http.StatusNotFound, "FILE_NOT_FOUND")
+	}
+	return c.JSON(updated)
+}
+
 func (s *Server) renameFile(c *fiber.Ctx) error {
 	id, fileID, err := tenantAndFile(c)
 	if err != nil {
@@ -120,6 +169,7 @@ func (s *Server) deleteFile(c *fiber.Ctx) error {
 		return err
 	}
 	_ = s.store.Delete(id.String(), item.StorageKey)
+	s.knowledge.dirty.Store(id, true)
 	s.repo.RecordAudit(c.Context(), id, auditActor(c), "FILE_DELETED", "FILE", fileID.String(), item.Filename)
 	return c.SendStatus(http.StatusNoContent)
 }

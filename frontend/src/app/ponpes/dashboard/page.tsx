@@ -58,11 +58,11 @@ export default function PonpesDashboard() {
   const pendingFiles = files.filter(file => file.status === "PENDING_SYNC").length;
   const profileDone = Boolean(profile && (profile.description || profile.address || profile.phone || profile.email));
   const steps = [
-    { done: profileDone, label: "Lengkapi informasi resmi pesantren", href: "/ponpes/profile" },
+    { done: profileDone, label: "Lengkapi informasi resmi pesantren", href: "/ponpes/profile?tab=info" },
     { done: files.length > 0, label: files.length ? `${files.length} dokumen tersimpan${pendingFiles ? `, ${pendingFiles} belum dipakai asisten` : ""}` : "Unggah minimal satu dokumen", href: "/ponpes/files" },
-    { done: provisioned, label: "Siapkan asisten", href: "/ponpes/profile" },
-    { done: Boolean(bot), label: "Hubungkan bot Telegram", href: "/ponpes/profile" },
-    { done: running, label: "Aktifkan asisten", href: "/ponpes/profile" },
+    { done: provisioned, label: "Siapkan asisten", href: "/ponpes/profile?tab=assistant" },
+    { done: Boolean(bot), label: "Hubungkan bot Telegram", href: "/ponpes/profile?tab=assistant" },
+    { done: running, label: "Aktifkan asisten", href: "/ponpes/profile?tab=assistant" },
   ];
   const next = steps.find(step => !step.done);
   const statusText = !provisioned ? "Belum disiapkan" : !bot ? "Menunggu Telegram" : running ? "Aktif" : "Siap diaktifkan";

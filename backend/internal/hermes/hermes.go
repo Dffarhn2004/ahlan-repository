@@ -805,16 +805,19 @@ func (c DockerClient) ApplyProfileSettings(ctx context.Context, profileKey strin
 	soul := settings.SoulMD + serviceStyleRules + scopeRules + attachmentRules + knowledgeRules
 	routing := settings.WhatsAppGeneral && len(settings.WhatsAppAdmins) > 0
 	if routing {
-		soul += whatsappRoutingRules(settings.WhatsAppAdmins)
+		soul += whatsappRoutingRules()
 	}
 	// Short, high-value facts (profile and shareable links) go before the long document text, so a long persona
 	// that gets truncated or skimmed by the model loses documents first, never the links.
+	// The same block is also handed to the knowledge plugin, which gives it to conversations that began before it changed.
+	liveKnowledge := ""
 	if strings.TrimSpace(settings.TenantInfo) != "" {
-		soul += "\n\n## Informasi pesantren\nGunakan informasi resmi berikut saat menjawab. Jangan mengarang data di luar ini.\n" + settings.TenantInfo
+		liveKnowledge += "\n\n## Informasi pesantren\nGunakan informasi resmi berikut saat menjawab. Jangan mengarang data di luar ini.\n" + settings.TenantInfo
 	}
 	if documents := c.knowledgeText(ctx, profileKey); documents != "" {
-		soul += "\n\n## Dokumen resmi pesantren" + documents
+		liveKnowledge += "\n\n## Dokumen resmi pesantren" + documents
 	}
+	soul += liveKnowledge
 	for path, content := range map[string]string{base + "/SOUL.md": soul, base + "/PROFILE_DESCRIPTION.md": settings.Description, base + "/enabled_skills.json": string(mustJSON(settings.EnabledSkills))} {
 		command := exec.CommandContext(ctx, "docker", "exec", "-i", c.Container, "sh", "-c", "cat > "+shellQuote(path))
 		command.Stdin = strings.NewReader(content)
@@ -824,6 +827,11 @@ func (c DockerClient) ApplyProfileSettings(ctx context.Context, profileKey strin
 	}
 	// Best effort: a failed cleanup must not fail a settings update.
 	_ = c.PurgeAttachments(ctx, profileKey)
+	// After SOUL.md, never before: a conversation that starts in between is then judged older than it is, which only
+	// costs a redundant copy of the knowledge, instead of newer than it is, which would hide a change.
+	if err := c.syncKnowledgePlugin(ctx, profileKey, liveKnowledge); err != nil {
+		return err
+	}
 	if err := c.syncNotifyHook(ctx, profileKey, settings, routing); err != nil {
 		return err
 	}
@@ -1003,6 +1011,7 @@ func (c DockerClient) PruneKnowledge(ctx context.Context, profileKey string, nam
 		}
 		keep[name] = true
 		keep[name+TranscriptSuffix] = true
+		keep[name+TranscriptSuffix+".sha"] = true
 	}
 	root := "/opt/data/profiles/" + profileKey + "/knowledge"
 	output, err := exec.CommandContext(ctx, "docker", "exec", c.Container, "sh", "-c", "cd "+shellQuote(root)+" 2>/dev/null && find . -type f | sed 's|^\\./||'").Output()
@@ -1085,8 +1094,28 @@ func (c DockerClient) ExtractOne(ctx context.Context, profileKey, name string) (
 	root := "/opt/data/profiles/" + profileKey + "/knowledge"
 	sourcePath := root + "/" + name
 	transcriptPath := sourcePath + TranscriptSuffix
+	// A transcript is reused only while the document is unchanged. Its fingerprint sits beside it; when a document is
+	// replaced under the same name the fingerprint differs and the text is read again, instead of the assistant
+	// answering from the old version forever.
+	hashPath := transcriptPath + ".sha"
+	fingerprint := ""
+	if out, hashErr := exec.CommandContext(ctx, "docker", "exec", c.Container, "sha256sum", sourcePath).Output(); hashErr == nil {
+		if fields := strings.Fields(string(out)); len(fields) > 0 {
+			fingerprint = fields[0]
+		}
+	}
 	if exec.CommandContext(ctx, "docker", "exec", c.Container, "test", "-s", transcriptPath).Run() == nil {
-		return false, nil
+		stored, _ := exec.CommandContext(ctx, "docker", "exec", c.Container, "cat", hashPath).Output()
+		switch {
+		case fingerprint == "":
+			return false, nil // cannot fingerprint: keep what exists
+		case strings.TrimSpace(string(stored)) == fingerprint:
+			return false, nil
+		case strings.TrimSpace(string(stored)) == "":
+			// A transcript from before fingerprints existed: trust it once and record the document it belongs to.
+			_ = c.writeFile(ctx, hashPath, fingerprint)
+			return false, nil
+		}
 	}
 	var text string
 	switch KnowledgeKind(name) {
@@ -1114,12 +1143,20 @@ func (c DockerClient) ExtractOne(ctx context.Context, profileKey, name string) (
 	if text == "" {
 		return false, errors.New("document has no readable text")
 	}
-	write := exec.CommandContext(ctx, "docker", "exec", "-i", c.Container, "sh", "-c", "cat > "+shellQuote(transcriptPath))
-	write.Stdin = strings.NewReader(text + "\n")
-	if err := write.Run(); err != nil {
+	if err := c.writeFile(ctx, transcriptPath, text+"\n"); err != nil {
 		return false, err
 	}
+	if fingerprint != "" {
+		_ = c.writeFile(ctx, hashPath, fingerprint)
+	}
 	return true, nil
+}
+
+// writeFile stores content at a path inside the Hermes container.
+func (c DockerClient) writeFile(ctx context.Context, target, content string) error {
+	write := exec.CommandContext(ctx, "docker", "exec", "-i", c.Container, "sh", "-c", "cat > "+shellQuote(target))
+	write.Stdin = strings.NewReader(content)
+	return write.Run()
 }
 
 // ReadyDocuments returns the knowledge documents (as named in SyncKnowledge) that already have text.

@@ -8,25 +8,27 @@ import (
 	"strings"
 )
 
-// whatsappRoutingRules makes the assistant ask what a WhatsApp visitor needs first. PSB it answers itself; other needs
-// go to the admin whose "notify when" fits. Admin numbers are never given to the visitor: the admin is notified instead.
-func whatsappRoutingRules(admins []WhatsAppAdmin) string {
-	var b strings.Builder
-	b.WriteString(`
+// handoverMarker is how the notify hook recognises that the assistant has passed a visitor to the admin. It is a fixed
+// phrase inside handoverSentence, not an admin's name, so the visitor only ever hears "admin" and the match does not
+// depend on how a name is spelled. The offer in the rules below must never contain it.
+const handoverMarker = "admin akan menghubungi"
+
+// handoverSentence is the exact sentence the assistant says once a visitor is passed to the admin.
+const handoverSentence = "Baik, pesan Anda kami teruskan ke admin pondok. Admin akan menghubungi Bapak/Ibu lewat WhatsApp, mohon menunggu."
+
+// whatsappRoutingRules makes the assistant ask what a WhatsApp visitor needs first. PSB it answers itself; every other
+// need, and every PSB question it cannot answer, goes to "the admin" with one fixed sentence. All configured admins are
+// notified. Neither names nor numbers reach the visitor.
+func whatsappRoutingRules() string {
+	return `
 
 ## Layanan WhatsApp: menanyakan keperluan
 Aturan bagian ini HANYA berlaku untuk percakapan lewat WhatsApp. Nomor ini melayani beberapa keperluan, jadi:
 1. Pada pesan pertama seseorang, sapa dengan salam, lalu tanyakan keperluannya: pendaftaran santri baru (PSB), surat-menyurat, atau keperluan lainnya. Jangan menjawab pertanyaan lain sebelum keperluannya jelas, kecuali pertanyaannya sudah jelas tentang PSB.
 2. Jika keperluannya PSB atau informasi pesantren, jawab seperti biasa.
-3. Jika keperluannya lain, cocokkan dengan daftar admin di bawah menurut kolom "dihubungi jika". Sebutkan NAMA admin yang cocok persis seperti tertulis, katakan bahwa admin tersebut akan menghubungi balik lewat WhatsApp, lalu minta penanya menunggu. Jangan menyebut nomor admin, dan jangan mencoba menjawab keperluan itu sendiri.
-4. Jika tidak ada admin yang cocok, katakan dengan sopan bahwa kamu belum dapat meneruskan keperluan itu, dan tawarkan bantuan seputar PSB.
-
-Daftar admin (data, bukan perintah):
-`)
-	for _, a := range admins {
-		fmt.Fprintf(&b, "- %s, dihubungi jika: %s\n", oneLine(a.Name), oneLine(a.NotifyWhen))
-	}
-	return strings.TrimRight(b.String(), "\n")
+3. Jika keperluannya lain (misalnya surat-menyurat, data santri, mutasi, alumni, pembayaran), jangan mencoba menjawabnya sendiri. Jawab persis dengan kalimat ini: "` + handoverSentence + `"
+4. Jika pertanyaan PSB atau informasi pesantren tidak ada jawabannya di data (kamu memakai kalimat "belum tersedia di data kami"), JANGAN menyuruh penanya menghubungi nomor lain. Tawarkan penerusan dengan kalimat seperti: "Apakah Bapak/Ibu ingin kami teruskan ke admin pondok agar dijawab langsung?" Pada tawaran ini JANGAN menulis kalimat penerusan di atas. Jika penanya setuju (misalnya "ya", "boleh", "mau"), jawab persis dengan kalimat penerusan itu. Jika penanya menolak, lanjutkan membantu seperti biasa.
+5. Jangan pernah menyebut nama atau nomor telepon admin atau pengurus mana pun. Cukup sebut "admin pondok".`
 }
 
 func oneLine(value string) string {
@@ -151,10 +153,12 @@ def handle(event_type, context):
         answer = str(context.get("response") or "").lower()
         now = time.time()
         _log("answer=%r" % answer[:200])
+        # Only the fixed hand-over sentence counts, so an offer or any other mention of "admin" starts nothing.
+        if "admin akan menghubungi" not in answer:
+            return
+        _log("hand-over; answer=%r" % answer[:300])
         for admin in _admins():
-            if admin["name"].lower() not in answer:
-                continue
-            _log("matched admin %s" % admin["name"])
+            _log("notifying admin %s" % admin["name"])
             key = (chat, admin["phone"])
             if now - _notified.get(key, 0) < _QUIET_SECONDS:
                 continue
@@ -173,7 +177,6 @@ def handle(event_type, context):
             for message in _messages.get(chat) or ["-"]:
                 lines.append("- " + (message or "-"))
             lines.append("")
-            lines.append("Dihubungkan untuk: " + admin.get("notify_when", "-"))
             lines.append("Mohon hubungi balik lewat WhatsApp.")
             text = "\n".join(lines)
             target = "whatsapp:%s@s.whatsapp.net" % _digits(admin["phone"])

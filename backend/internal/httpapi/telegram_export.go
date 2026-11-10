@@ -2,12 +2,94 @@ package httpapi
 
 import (
 	"bytes"
+	"fmt"
+	"strings"
 	"time"
 
+	"github.com/gofiber/fiber/v2"
 	"github.com/google/uuid"
 	"github.com/xuri/excelize/v2"
 	"ponpes-saas/internal/repository"
 )
+
+type telegramExportFilterResult struct {
+	rows  repository.TelegramExportFilter
+	from  *time.Time
+	until *time.Time
+}
+
+// telegramExportFilter reads optional from/to dates (Asia/Jakarta, inclusive) and repeated conversation ids.
+func telegramExportFilter(c *fiber.Ctx) (telegramExportFilterResult, error) {
+	from, until, err := telegramExportWindow(c.Query("from"), c.Query("to"))
+	if err != nil {
+		return telegramExportFilterResult{}, fiber.NewError(fiber.StatusBadRequest, "INVALID_REQUEST")
+	}
+	var ids []uuid.UUID
+	for _, raw := range c.Context().QueryArgs().PeekMulti("conversation") {
+		value := strings.TrimSpace(string(raw))
+		if value == "" {
+			continue
+		}
+		id, parseErr := uuid.Parse(value)
+		if parseErr != nil {
+			return telegramExportFilterResult{}, fiber.NewError(fiber.StatusBadRequest, "INVALID_REQUEST")
+		}
+		ids = append(ids, id)
+		if len(ids) > 200 {
+			return telegramExportFilterResult{}, fiber.NewError(fiber.StatusBadRequest, "INVALID_REQUEST")
+		}
+	}
+	return telegramExportFilterResult{rows: repository.TelegramExportFilter{ConversationIDs: ids}, from: from, until: until}, nil
+}
+
+// telegramExportWindow turns inclusive calendar dates into a half-open instant range in Asia/Jakarta.
+func telegramExportWindow(from, to string) (*time.Time, *time.Time, error) {
+	from, to = strings.TrimSpace(from), strings.TrimSpace(to)
+	if from == "" && to == "" {
+		return nil, nil, nil
+	}
+	loc, err := time.LoadLocation("Asia/Jakarta")
+	if err != nil {
+		loc = time.FixedZone("WIB", 7*60*60)
+	}
+	var start, end *time.Time
+	if from != "" {
+		parsed, parseErr := time.ParseInLocation("2006-01-02", from, loc)
+		if parseErr != nil {
+			return nil, nil, parseErr
+		}
+		start = &parsed
+	}
+	if to != "" {
+		parsed, parseErr := time.ParseInLocation("2006-01-02", to, loc)
+		if parseErr != nil {
+			return nil, nil, parseErr
+		}
+		next := parsed.AddDate(0, 0, 1)
+		end = &next
+	}
+	if start != nil && end != nil && !start.Before(*end) {
+		return nil, nil, fmt.Errorf("export date range is reversed")
+	}
+	return start, end, nil
+}
+
+func filterExportTurns(turns []telegramExportTurn, from, until *time.Time) []telegramExportTurn {
+	if from == nil && until == nil {
+		return turns
+	}
+	out := make([]telegramExportTurn, 0, len(turns))
+	for _, turn := range turns {
+		if from != nil && turn.CreatedAt.Before(*from) {
+			continue
+		}
+		if until != nil && !turn.CreatedAt.Before(*until) {
+			continue
+		}
+		out = append(out, turn)
+	}
+	return out
+}
 
 type telegramExportTurn struct {
 	Username   string

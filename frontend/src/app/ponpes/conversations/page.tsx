@@ -1,10 +1,11 @@
 "use client";
 
 import { useEffect, useMemo, useRef, useState } from "react";
-import { CheckCircle2, Clock3, Download, LifeBuoy, MessageSquare, RefreshCw, RotateCcw, Search, UsersRound, X } from "lucide-react";
+import { CheckCircle2, Clock3, LifeBuoy, MessageSquare, RefreshCw, RotateCcw, Search, UsersRound, X } from "lucide-react";
 import { AppShell, PageHeader } from "@/components/app-shell";
 import { api } from "@/lib/api";
 import { Pagination, usePagination } from "@/components/pagination";
+import { TelegramExportButton } from "@/components/telegram-export";
 import { can, chooseTenant, loadAuth, type AuthContext } from "@/lib/auth";
 
 type Tenant = { id: string; name: string };
@@ -28,6 +29,7 @@ export default function ConversationsPage() {
   const [auth, setAuth] = useState<AuthContext | null>(null);
   const [updating, setUpdating] = useState(false);
   const loadedOnce = useRef(false);
+  const threadRef = useRef<HTMLDivElement>(null);
 
   async function load(search = query) {
     // Typing in the search box refreshes quietly instead of blanking the inbox.
@@ -59,6 +61,18 @@ export default function ConversationsPage() {
     return () => { cancelled = true; };
   }, [selected]);
 
+  useEffect(() => {
+    if (messagesLoading || !messages.length) return;
+    const frame = requestAnimationFrame(() => {
+      const thread = threadRef.current;
+      if (!thread) return;
+      thread.scrollTop = thread.scrollHeight;
+      const panel = thread.closest(".conversation-detail");
+      if (panel instanceof HTMLElement) panel.scrollTop = panel.scrollHeight;
+    });
+    return () => cancelAnimationFrame(frame);
+  }, [messages, messagesLoading, selected?.id]);
+
   // On phones the thread opens as a full-screen sheet; Escape closes it.
   useEffect(() => {
     if (!selected) return;
@@ -79,10 +93,8 @@ export default function ConversationsPage() {
       if (updated) { setItems(current => current.map(item => item.id === updated.id ? { ...item, status: updated.status } : item)); setSelected(current => current ? { ...current, status: updated.status } : current); }
     } catch { setError("Status percakapan gagal diperbarui."); } finally { setUpdating(false); }
   }
-  const exportLog = () => { window.location.href = `${process.env.NEXT_PUBLIC_API_URL ?? "http://localhost:8080"}/api/v1/tenants/${tenantId}/telegram/export`; };
-
   return <AppShell mode="ponpes" title="Percakapan">
-    <PageHeader eyebrow="Telegram" title="Percakapan Telegram" description={tenantName ? `Pantau percakapan calon santri untuk ${tenantName}.` : "Pantau percakapan calon santri dengan asisten AI."} action={<><button className="button" onClick={exportLog} disabled={!tenantId || !items.length}><Download size={15} />Ekspor Excel</button><button className="button" onClick={() => void load()} disabled={loading}><RefreshCw size={15} className={loading ? "spin" : ""} />Muat ulang</button></>} />
+    <PageHeader eyebrow="Telegram" title="Percakapan Telegram" description={tenantName ? `Pantau percakapan calon santri untuk ${tenantName}.` : "Pantau percakapan calon santri dengan asisten AI."} action={<><TelegramExportButton tenantId={tenantId} conversations={items} disabled={!tenantId || !items.length} label="Ekspor Excel" /><button className="button" onClick={() => void load()} disabled={loading}><RefreshCw size={15} className={loading ? "spin" : ""} />Muat ulang</button></>} />
     {error && <div className="notice notice-danger">{error}</div>}
     <section className="conversation-stats">
       <div><span className="conversation-stat-icon"><MessageSquare size={17} /></span><div><strong>{loading ? "—" : items.length}</strong><span>Total percakapan</span></div></div>
@@ -102,7 +114,7 @@ export default function ConversationsPage() {
       <aside className={`panel conversation-detail${selected ? " open" : ""}`} role={selected ? "dialog" : undefined} aria-label={selected ? "Riwayat percakapan" : undefined}>
         {!selected ? <><div className="conversation-detail-icon"><MessageSquare size={25} /></div><h2>Belum ada percakapan dipilih</h2><p>Pilih percakapan di inbox untuk melihat riwayat pesan dan jawaban asisten.</p></> : <>
           <div className="conversation-thread-head"><button className="conversation-close" type="button" onClick={() => setSelected(null)} aria-label="Tutup percakapan"><X size={18} /></button><strong>{selected.username ? `@${selected.username}` : "Pengguna Telegram"}</strong><span>Dimulai {dateTime(selected.started_at ?? selected.last_message_at)} · {statusLabel(selected.status)}</span>{canManage && <div className="conversation-actions">{selected.status === "ACTIVE" && <button className="button" type="button" disabled={updating} onClick={() => void changeStatus("HANDOFF")}><LifeBuoy size={14} />Tandai perlu bantuan</button>}{selected.status !== "RESOLVED" && <button className="button" type="button" disabled={updating} onClick={() => void changeStatus("RESOLVED")}><CheckCircle2 size={14} />Tandai selesai</button>}{selected.status !== "ACTIVE" && <button className="button button-ghost" type="button" disabled={updating} onClick={() => void changeStatus("ACTIVE")}><RotateCcw size={14} />{selected.status === "HANDOFF" ? "Kembalikan ke asisten" : "Buka kembali"}</button>}</div>}</div>
-          {messagesLoading ? <p className="section-hint">Memuat pesan…</p> : messages.length ? <div className="conversation-thread">{messages.map(message => <div key={message.id} className={`chat-bubble ${message.sender_type === "USER" ? "from-user" : "from-bot"}`}><span className="chat-sender">{message.sender_type === "USER" ? "Pengguna" : message.sender_type === "BOT" ? "Asisten" : "Admin"}</span><p>{message.message_text}</p><time>{dateTime(message.created_at)}</time></div>)}</div> : <p className="section-hint">Belum ada pesan pada percakapan ini.</p>}
+          {messagesLoading ? <p className="section-hint">Memuat pesan…</p> : messages.length ? <div className="conversation-thread" ref={threadRef}>{messages.map(message => <div key={message.id} className={`chat-bubble ${message.sender_type === "USER" ? "from-user" : "from-bot"}`}><span className="chat-sender">{message.sender_type === "USER" ? "Pengguna" : message.sender_type === "BOT" ? "Asisten" : "Admin"}</span><p>{message.message_text}</p><time>{dateTime(message.created_at)}</time></div>)}</div> : <p className="section-hint">Belum ada pesan pada percakapan ini.</p>}
         </>}
       </aside>
     </section>

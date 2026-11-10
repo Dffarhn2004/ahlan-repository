@@ -18,6 +18,10 @@ type knowledgeJobs struct {
 	running sync.Map
 	// failures holds, per tenant, the documents the last reading run could not read (*sync.Map of name -> true).
 	failures sync.Map
+	// dirty holds the tenants whose documents were replaced or deleted since the assistant last re-read them. A removed
+	// document leaves nothing new to read, so without this flag the persona would keep the removed text until some
+	// unrelated change rewrote it.
+	dirty sync.Map
 }
 
 func (s *Server) profileSettings(ctx context.Context, profileKey string, settings repository.HermesSettings) hermes.ProfileSettings {
@@ -151,8 +155,13 @@ func (s *Server) startKnowledgeReading(tenantID uuid.UUID, profileKey string) in
 			}
 		}
 		createdFast, failedFast := client.ExtractKnowledgeText(ctx, profileKey, fast, track)
-		if createdFast > 0 || len(slow) == 0 {
+		_, changed := s.knowledge.dirty.LoadAndDelete(tenantID)
+		if createdFast > 0 || len(slow) == 0 || changed {
 			s.refreshPersona(ctx, profileKey)
+		}
+		// A changed text document only reaches visitors after a restart, just like a read picture or office file.
+		if createdFast > 0 || changed {
+			s.restartIfActive(ctx, tenantID, profileKey)
 		}
 		created, failed := client.ExtractKnowledgeText(ctx, profileKey, slow, track)
 		slog.Info("knowledge read", "profile", profileKey, "created", createdFast+created, "failed", len(failedFast)+len(failed))

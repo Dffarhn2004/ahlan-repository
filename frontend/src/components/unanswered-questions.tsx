@@ -3,6 +3,7 @@
 import { useEffect, useState } from "react";
 import { LoaderCircle, MessageCircleQuestion, Pencil, Trash2 } from "lucide-react";
 import { api, ApiError } from "@/lib/api";
+import { Pagination, usePagination } from "@/components/pagination";
 
 type Status = "OPEN" | "ANSWERED" | "RESOLVED" | "IGNORED";
 type Question = { id: string; question: string; ask_count: number; status: Status; faq_question: string; answer: string; first_asked_at: string; last_asked_at: string };
@@ -65,6 +66,7 @@ export function UnansweredQuestions({ tenantId, canEdit, onOpenCount }: { tenant
 
   const startAnswer = (item: Question) => { setNotice(""); setAnswering(item.id); setFaq(item.faq_question || item.question); setAnswer(item.answer); };
   const tab = tabs.find(item => item.status === status)!;
+  const paged = usePagination(items ?? [], 10, status);
 
   return <section className="panel panel-pad" style={{ display: "grid", gap: 16 }}>
     <div><h2 className="section-title">Pertanyaan belum terjawab</h2><p className="section-hint">Pertanyaan pengunjung yang tidak bisa dijawab asisten dikumpulkan di sini. Jawab langsung agar asisten bisa menjawabnya lain kali, atau tandai selesai jika jawabannya sudah ditambahkan lewat dokumen atau sumber web.</p></div>
@@ -78,7 +80,7 @@ export function UnansweredQuestions({ tenantId, canEdit, onOpenCount }: { tenant
       <div>
         {items === null && <p className="empty"><LoaderCircle size={14} className="spin" /> Memuat…</p>}
         {items?.length === 0 && <p className="empty">{tab.empty}</p>}
-        {items?.map(item => <div key={item.id} style={{ display: "grid", gap: 10, padding: "14px 0", borderTop: "1px solid var(--line)" }}>
+        {paged.rows.map(item => <div key={item.id} style={{ display: "grid", gap: 10, padding: "14px 0", borderTop: "1px solid var(--line)" }}>
           <div style={{ display: "flex", gap: 12, justifyContent: "space-between", alignItems: "flex-start", flexWrap: "wrap" }}>
             <div style={{ minWidth: 0, flex: 1 }}>
               <strong style={{ overflowWrap: "anywhere" }}><MessageCircleQuestion size={15} style={{ verticalAlign: "-2px", marginRight: 6 }} aria-hidden />{item.question}</strong>
@@ -108,6 +110,7 @@ export function UnansweredQuestions({ tenantId, canEdit, onOpenCount }: { tenant
             </div>
           </form>}
         </div>)}
+        {items && items.length > 0 && <Pagination paged={paged} label="pertanyaan" />}
       </div>
     </div>
   </section>;

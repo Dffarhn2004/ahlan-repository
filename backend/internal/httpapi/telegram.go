@@ -130,11 +130,15 @@ func (s *Server) exportTelegramLog(c *fiber.Ctx) error {
 	if err != nil {
 		return fiber.NewError(http.StatusBadRequest, "INVALID_TENANT_ID")
 	}
-	rows, err := s.repo.TelegramExportRows(c.Context(), tenantID)
+	filter, err := telegramExportFilter(c)
 	if err != nil {
 		return err
 	}
-	file, err := telegramWorkbook(pairTelegramExportRows(rows))
+	rows, err := s.repo.TelegramExportRows(c.Context(), tenantID, filter.rows)
+	if err != nil {
+		return err
+	}
+	file, err := telegramWorkbook(filterExportTurns(pairTelegramExportRows(rows), filter.from, filter.until))
 	if err != nil {
 		return fmt.Errorf("telegram export failed: %w", err)
 	}

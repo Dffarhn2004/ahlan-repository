@@ -186,8 +186,19 @@ type TelegramExportRow struct {
 	CreatedAt      time.Time
 }
 
-func (r Repository) TelegramExportRows(ctx context.Context, tenantID uuid.UUID) ([]TelegramExportRow, error) {
-	rows, err := r.DB.Query(ctx, `SELECT m.conversation_id,coalesce(c.username,''),c.telegram_chat_id,m.sender_type,m.message_text,m.created_at FROM telegram_messages m JOIN telegram_conversations c ON c.id=m.conversation_id WHERE c.tenant_id=$1 ORDER BY m.created_at ASC`, tenantID)
+// TelegramExportFilter limits an Excel export to chosen conversations. Dates are applied after question and answer are paired.
+type TelegramExportFilter struct {
+	ConversationIDs []uuid.UUID
+}
+
+func (r Repository) TelegramExportRows(ctx context.Context, tenantID uuid.UUID, filter TelegramExportFilter) ([]TelegramExportRow, error) {
+	args := []any{tenantID}
+	conditions := []string{`c.tenant_id=$1`}
+	if len(filter.ConversationIDs) > 0 {
+		args = append(args, filter.ConversationIDs)
+		conditions = append(conditions, `c.id = ANY($`+strconv.Itoa(len(args))+`)`)
+	}
+	rows, err := r.DB.Query(ctx, `SELECT m.conversation_id,coalesce(c.username,''),c.telegram_chat_id,m.sender_type,m.message_text,m.created_at FROM telegram_messages m JOIN telegram_conversations c ON c.id=m.conversation_id WHERE `+strings.Join(conditions, ` AND `)+` ORDER BY m.created_at ASC`, args...)
 	if err != nil {
 		return nil, err
 	}
@@ -357,6 +368,12 @@ func (r Repository) SetConversationStatus(ctx context.Context, conversationID uu
 		return item, ErrNotFound
 	}
 	return item, err
+}
+
+// TouchConversation marks a conversation as active now without changing its status.
+func (r Repository) TouchConversation(ctx context.Context, conversationID uuid.UUID) error {
+	_, err := r.DB.Exec(ctx, `UPDATE telegram_conversations SET last_message_at=now() WHERE id=$1`, conversationID)
+	return err
 }
 
 func (r Repository) ConversationTenant(ctx context.Context, conversationID uuid.UUID) (uuid.UUID, error) {

@@ -12,6 +12,14 @@ import { validateMapsUrl, validateOfficialLink, type LinkKind } from "@/lib/link
 type Tenant = { id: string; name: string; slug?: string };
 type Profile = { display_name?: string; description?: string; address?: string; phone?: string; email?: string; website?: string; google_maps_url?: string; instagram_url?: string; facebook_url?: string; tiktok_url?: string; youtube_url?: string; has_logo?: boolean };
 
+type ProfileTab = "assistant" | "info" | "links" | "contacts";
+const profileTabs: { value: ProfileTab; label: string }[] = [
+  { value: "assistant", label: "Asisten AI" },
+  { value: "info", label: "Informasi pesantren" },
+  { value: "links", label: "Tautan resmi" },
+  { value: "contacts", label: "Kontak person" },
+];
+
 const socialFields: { key: "instagram_url" | "facebook_url" | "tiktok_url" | "youtube_url"; kind: LinkKind; label: string; placeholder: string }[] = [
   { key: "instagram_url", kind: "INSTAGRAM", label: "Instagram", placeholder: "https://www.instagram.com/…" },
   { key: "facebook_url", kind: "FACEBOOK", label: "Facebook", placeholder: "https://www.facebook.com/…" },
@@ -29,6 +37,7 @@ export default function ProfilePage() {
   const [logoBusy, setLogoBusy] = useState(false);
   const [logoNotice, setLogoNotice] = useState("");
   const [logoVersion, setLogoVersion] = useState(0);
+  const [tab, setTab] = useState<ProfileTab>("assistant");
 
   useEffect(() => {
     void (async () => {
@@ -46,6 +55,12 @@ export default function ProfilePage() {
       } catch { setNotice("Profil belum dapat dimuat."); }
     })();
   }, []);
+
+  useEffect(() => {
+    const selected = new URLSearchParams(window.location.search).get("tab") as ProfileTab | null;
+    if (selected && profileTabs.some(item => item.value === selected)) setTab(selected);
+  }, []);
+  const selectTab = (value: ProfileTab) => { setTab(value); window.history.replaceState({}, "", `?tab=${value}`); };
 
   const mapsError = validateMapsUrl(profile.google_maps_url ?? "");
   const socialErrors = Object.fromEntries(socialFields.map(field => [field.key, validateOfficialLink(field.kind, profile[field.key] ?? "")])) as Record<string, string>;
@@ -92,9 +107,13 @@ export default function ProfilePage() {
 
   return <AppShell mode="ponpes" title="Asisten AI">
     <PageHeader eyebrow="Asisten AI" title="Asisten & informasi pesantren" description="Aktifkan asisten untuk calon santri dan atur informasi resmi yang menjadi rujukan jawabannya." />
+    <nav className="hermes-subtabs" aria-label="Bagian profil">
+      {profileTabs.map(item => <button key={item.value} className={tab === item.value ? "active" : ""} type="button" aria-selected={tab === item.value} onClick={() => selectTab(item.value)}>{item.label}</button>)}
+    </nav>
+    {notice && tab !== "info" && <p className={notice.includes("disimpan") ? "status" : "error"} role="status" style={{ marginBottom: 16 }}>{notice}</p>}
     <div style={{ display: "grid", gap: 20 }}>
-      {tenantId && <AssistantPanel tenantId={tenantId} canManage={can(auth, "assistant:manage")} canDelete={auth?.role === "SUPERADMIN"} />}
-      <form className="panel panel-pad" onSubmit={save}>
+      {tab === "assistant" && tenantId && <AssistantPanel tenantId={tenantId} canManage={can(auth, "assistant:manage")} canDelete={auth?.role === "SUPERADMIN"} />}
+      {tab === "info" && <form className="panel panel-pad" onSubmit={save}>
         <div className="card-heading"><div><h2 className="section-title">Informasi resmi pesantren</h2><p className="section-hint">Asisten memakai informasi ini saat menjawab. Hindari memasukkan rahasia atau data pribadi.</p></div></div>
         <div style={{ display: "flex", gap: 16, alignItems: "center", flexWrap: "wrap", marginBottom: 20 }}>
           <div style={{ width: 80, height: 80, borderRadius: 16, border: "1px solid var(--line)", display: "grid", placeItems: "center", overflow: "hidden", background: "#fff" }}>
@@ -136,9 +155,9 @@ export default function ProfilePage() {
         </div>
         {notice && <p className={notice.includes("disimpan") ? "status" : "error"} style={{ marginTop: 16 }} role="status">{notice}</p>}
         {canEdit && <div style={{ marginTop: 18 }}><button className="button button-primary" disabled={!tenantId || saving}>{saving ? "Menyimpan…" : "Simpan perubahan"}</button></div>}
-      </form>
-      {tenantId && <OfficialLinks tenantId={tenantId} canEdit={canEdit} />}
-      {tenantId && <ContactPersons tenantId={tenantId} canEdit={canEdit} />}
+      </form>}
+      {tab === "links" && tenantId && <OfficialLinks tenantId={tenantId} canEdit={canEdit} />}
+      {tab === "contacts" && tenantId && <ContactPersons tenantId={tenantId} canEdit={canEdit} />}
     </div>
   </AppShell>;
 }

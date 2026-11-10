@@ -94,6 +94,7 @@ func (s *Server) tenantRoutes(t fiber.Router) {
 	t.Get("/files/:file_id", read, s.downloadFile)
 	t.Get("/files/:file_id/download", read, s.downloadFile)
 	t.Patch("/files/:file_id", allow("file:update"), s.renameFile)
+	t.Put("/files/:file_id/content", allow("file:update"), s.replaceFile)
 	t.Delete("/files/:file_id", allow("file:delete"), s.deleteFile)
 	t.Get("/folders", read, s.listFolders)
 	t.Post("/folders", allow("file:create"), s.createFolder)
